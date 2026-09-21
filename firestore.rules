@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Guards
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Bootstrapped Admin: user email from runtime (grupoulep@gmail.com) or in admins collection
+    function isAdmin() {
+      return (isSignedIn() && request.auth.token.email == 'grupoulep@gmail.com') ||
+             (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    // Helper: Validate Survey Schema & Invariants
+    function isValidSurvey(data) {
+      return data.keys().hasAll(['title', 'category', 'isActive', 'isPrimaryActive', 'questions']) &&
+             data.keys().hasOnly(['title', 'description', 'category', 'isActive', 'isPrimaryActive', 'createdAt', 'questions']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 250 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.isActive is bool &&
+             data.isPrimaryActive is bool &&
+             data.questions is list && data.questions.size() <= 100 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 1500)) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100));
+    }
+
+    // Helper: Validate Auxiliary Staff Record
+    function isValidAuxiliary(data) {
+      return data.keys().hasAll(['name', 'accessCode', 'department', 'assignedSurveyIds']) &&
+             data.keys().hasOnly(['name', 'accessCode', 'department', 'assignedSurveyIds', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+             data.accessCode is string && data.accessCode.size() > 0 && data.accessCode.size() <= 50 &&
+             data.department is string && data.department.size() <= 150 &&
+             data.assignedSurveyIds is list && data.assignedSurveyIds.size() <= 100 &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100));
+    }
+
+    // Helper: Validate Survey Response Schema
+    function isValidSurveyResponse(data) {
+      return data.keys().hasAll(['surveyId', 'participantName', 'submittedAt', 'answers']) &&
+             data.keys().hasOnly(['surveyId', 'participantName', 'submittedAt', 'answers', 'registeredBy']) &&
+             data.surveyId is string && isValidId(data.surveyId) &&
+             data.participantName is string && data.participantName.size() > 0 && data.participantName.size() <= 150 &&
+             data.submittedAt is string && data.submittedAt.size() <= 100 &&
+             data.answers is map &&
+             (!('registeredBy' in data) || (data.registeredBy is string && data.registeredBy.size() <= 100));
+    }
+
+    // Helper: Validate Platform Settings Record
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll(['title']) &&
+             data.keys().hasOnly(['title', 'subtitle', 'institutionName', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             (!('subtitle' in data) || (data.subtitle is string && data.subtitle.size() <= 300)) &&
+             (!('institutionName' in data) || (data.institutionName is string && data.institutionName.size() <= 50)) &&
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 100));
+    }
+
+    // Helper: Validate Admin Record
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['email', 'role']) &&
+             data.keys().hasOnly(['email', 'role', 'createdAt']) &&
+             data.email is string && data.email.size() <= 150 &&
+             data.role == 'admin' &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100));
+    }
+
+    // Match /surveys
+    match /surveys/{surveyId} {
+      allow read: if isValidId(surveyId);
+      allow create: if isValidId(surveyId) && isAdmin() && isValidSurvey(incoming());
+      allow update: if isValidId(surveyId) && isAdmin() && isValidSurvey(incoming());
+      allow delete: if isValidId(surveyId) && isAdmin();
+    }
+
+    // Match /auxiliaries
+    match /auxiliaries/{auxiliaryId} {
+      allow read: if isValidId(auxiliaryId);
+      allow create: if isValidId(auxiliaryId) && isAdmin() && isValidAuxiliary(incoming());
+      allow update: if isValidId(auxiliaryId) && isAdmin() && isValidAuxiliary(incoming());
+      allow delete: if isValidId(auxiliaryId) && isAdmin();
+    }
+
+    // Match /surveyResponses
+    match /surveyResponses/{responseId} {
+      // Read responses for display, statistics, and reporting
+      allow read: if isValidId(responseId);
+      // Creation allowed for participants and auxiliaries submitting valid responses
+      allow create: if isValidId(responseId) && isValidSurveyResponse(incoming());
+      // Immutability: Once submitted, survey responses cannot be tampered with or modified
+      allow update: if false;
+      allow delete: if isValidId(responseId) && isAdmin();
+    }
+
+    // Match /platformSettings
+    match /platformSettings/{settingId} {
+      allow read: if isValidId(settingId);
+      allow create: if isValidId(settingId) && isAdmin() && isValidPlatformSettings(incoming());
+      allow update: if isValidId(settingId) && isAdmin() && isValidPlatformSettings(incoming());
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+
+    // Match /admins
+    match /admins/{adminId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming());
+    }
+  }
+}

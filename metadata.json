@@ -1,0 +1,6 @@
+{
+  "name": "Sistema de Encuestas IULEP",
+  "description": "Plataforma interactiva de encuestas con panel de administración, gestión de auxiliares, control de acceso y reportes en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,178 @@
+{
+  "entities": {
+    "Survey": {
+      "title": "Survey",
+      "description": "Institutional survey definition with questions and activation state",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the survey",
+          "maxLength": 250
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description and instructions for participants",
+          "maxLength": 1500
+        },
+        "category": {
+          "type": "string",
+          "description": "Academic or institutional category",
+          "maxLength": 100
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the survey is active for receiving responses"
+        },
+        "isPrimaryActive": {
+          "type": "boolean",
+          "description": "Whether the survey is the default primary survey for participants"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp or server creation date"
+        },
+        "questions": {
+          "type": "array",
+          "description": "List of questions configured in this survey"
+        }
+      },
+      "required": ["title", "category", "isActive", "isPrimaryActive", "questions"]
+    },
+    "Auxiliary": {
+      "title": "Auxiliary",
+      "description": "Auxiliary staff member authorized to register participant surveys",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of auxiliary personnel",
+          "maxLength": 150
+        },
+        "accessCode": {
+          "type": "string",
+          "description": "Unique access code used for auxiliary authentication",
+          "maxLength": 50,
+          "pattern": "^[A-Za-z0-9_\\-]+$"
+        },
+        "department": {
+          "type": "string",
+          "description": "Department or faculty assigned to",
+          "maxLength": 150
+        },
+        "assignedSurveyIds": {
+          "type": "array",
+          "description": "IDs of surveys this auxiliary is assigned to administer"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when auxiliary was registered"
+        }
+      },
+      "required": ["name", "accessCode", "department", "assignedSurveyIds"]
+    },
+    "SurveyResponse": {
+      "title": "SurveyResponse",
+      "description": "Response submitted by a participant directly or via auxiliary",
+      "type": "object",
+      "properties": {
+        "surveyId": {
+          "type": "string",
+          "description": "ID of the survey being answered",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "participantName": {
+          "type": "string",
+          "description": "Name or pseudonym of the participant",
+          "maxLength": 150
+        },
+        "submittedAt": {
+          "type": "string",
+          "description": "ISO timestamp of survey completion"
+        },
+        "answers": {
+          "type": "object",
+          "description": "Key-value map of question IDs to user answers"
+        },
+        "registeredBy": {
+          "type": "string",
+          "description": "Access code, auxiliary name, or direct participant indicator",
+          "maxLength": 100
+        }
+      },
+      "required": ["surveyId", "participantName", "submittedAt", "answers"]
+    },
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Platform global title, subtitle and institutional acronym",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Platform main heading title",
+          "maxLength": 200
+        },
+        "subtitle": {
+          "type": "string",
+          "description": "Platform secondary subtitle or agency name",
+          "maxLength": 300
+        },
+        "institutionName": {
+          "type": "string",
+          "description": "Short name or acronym of institution",
+          "maxLength": 50
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of last modification"
+        }
+      },
+      "required": ["title"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Designated administrator user with full privileges",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Verified Google email of the administrator",
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "Role identifier",
+          "enum": ["admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when admin role was granted"
+        }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/surveys/{surveyId}": {
+      "schema": "Survey",
+      "description": "Institutional surveys collection"
+    },
+    "/auxiliaries/{auxiliaryId}": {
+      "schema": "Auxiliary",
+      "description": "Authorized auxiliary personnel directory"
+    },
+    "/surveyResponses/{responseId}": {
+      "schema": "SurveyResponse",
+      "description": "All survey responses submitted across surveys"
+    },
+    "/platformSettings/{settingId}": {
+      "schema": "PlatformSettings",
+      "description": "System branding and titles settings"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Designated system administrators collection"
+    }
+  }
+}
