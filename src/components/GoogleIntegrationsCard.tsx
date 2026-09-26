@@ -22,6 +22,9 @@ import {
   HelpCircle,
   ShieldCheck,
   Zap,
+  Copy,
+  Check,
+  Globe,
 } from 'lucide-react';
 
 interface GoogleIntegrationsCardProps {
@@ -65,6 +68,7 @@ export const GoogleIntegrationsCard: React.FC<GoogleIntegrationsCardProps> = ({
   const [isTestingEmail, setIsTestingEmail] = useState(false);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   const [minutesRemaining, setMinutesRemaining] = useState<number>(() =>
     getTokenMinutesRemaining(integration?.tokenExpiry)
@@ -142,10 +146,17 @@ export const GoogleIntegrationsCard: React.FC<GoogleIntegrationsCardProps> = ({
       (err) => {
         setIsAuthorizing(false);
         console.error('Google Auth Error:', err);
-        setAuthError(
-          err?.message ||
-            'No se pudo completar la vinculación con Google. Asegúrate de permitir las ventanas emergentes (popups).'
-        );
+        const errStr = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+        if (errStr.includes('origin_mismatch') || errStr.includes('400')) {
+          setAuthError(
+            `Error 400: origin_mismatch en ${window.location.origin}. Para autorizar este dominio en Google OAuth, agrega '${window.location.origin}' en Google Cloud Console > APIs y servicios > Credenciales > Orígenes de JavaScript autorizados.`
+          );
+        } else {
+          setAuthError(
+            err?.message ||
+              'No se pudo completar la vinculación con Google. Asegúrate de permitir las ventanas emergentes (popups).'
+          );
+        }
       }
     );
   };
@@ -405,7 +416,7 @@ export const GoogleIntegrationsCard: React.FC<GoogleIntegrationsCardProps> = ({
       </div>
 
       {/* Security Guidance for Google OAuth Consent Screen */}
-      <div className="mx-6 mt-4 p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-900 text-xs">
+      <div className="mx-6 mt-4 p-3.5 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-900 text-xs space-y-2">
         <div className="flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
           <div className="space-y-1">
@@ -415,6 +426,70 @@ export const GoogleIntegrationsCard: React.FC<GoogleIntegrationsCardProps> = ({
             <p className="text-amber-800 text-2xs leading-relaxed">
               Es el comportamiento normal de Google para apps internas sin auditoría pública. Para continuar de forma 100% segura: haz clic en <strong>&ldquo;Configuración avanzada&rdquo;</strong> (abajo a la izquierda en la ventana de Google) y luego en <strong>&ldquo;Ir a Sistema de Encuestas (no seguro)&rdquo;</strong> para autorizar la sincronización de Sheets y correos por Gmail.
             </p>
+          </div>
+        </div>
+
+        {/* Custom Domain & Origin Assistance */}
+        <div className="pt-3 border-t border-amber-200/60 space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-amber-700" />
+              <span className="font-bold text-amber-950 text-2xs">Dominio Personalizado:</span>
+              <code className="px-2 py-0.5 rounded bg-amber-100/90 font-mono text-amber-900 font-semibold text-2xs">
+                https://form.groupulep.com
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText('https://form.groupulep.com');
+                  setCopiedDomain(true);
+                  setTimeout(() => setCopiedDomain(false), 2500);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-200/70 hover:bg-amber-200 text-amber-900 text-2xs font-medium cursor-pointer transition-colors"
+                title="Copiar URL para Google Cloud"
+              >
+                {copiedDomain ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-700" />
+                    <span className="text-emerald-800 font-bold">¡Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3" />
+                    <span>Copiar URI</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <a
+              href="https://console.cloud.google.com/apis/credentials/oauthclient/1065688809566-u39c2jr8bdbr62iiqem2bdp4aj55fjf2.apps.googleusercontent.com?project=gen-lang-client-0359071638"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-900 hover:bg-amber-950 text-white font-semibold text-2xs transition-colors shadow-xs"
+            >
+              <span>Abrir Google Cloud Console</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          <p className="text-amber-800 text-2xs leading-relaxed">
+            <strong>¿Cómo registrarlo?</strong> Haz clic en el botón superior <em>&ldquo;Abrir Google Cloud Console&rdquo;</em>, busca la sección <strong>&ldquo;Orígenes de JavaScript autorizados&rdquo;</strong>, pulsa <strong>+ AGREGAR URI</strong>, pega <code className="bg-amber-100 px-1 rounded">https://form.groupulep.com</code> y pulsa <strong>Guardar</strong>.
+          </p>
+
+          <div className="p-2 rounded-lg bg-white/70 border border-amber-200/60 text-2xs text-amber-900 flex items-center justify-between gap-3">
+            <span>
+              ⚡ <strong>¿Necesitas autorizarlo inmediatamente sin esperar?</strong> Puedes conectar tu cuenta desde la dirección autorizada de respaldo y se sincronizará automáticamente a tu dominio por Firestore:
+            </span>
+            <a
+              href="https://ais-pre-5jhvwa33n3xqrtkvawc6h2-582520961682.us-east1.run.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-2xs inline-flex items-center gap-1 shadow-xs"
+            >
+              <span>Vincular por URL Autorizada</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
           </div>
         </div>
       </div>

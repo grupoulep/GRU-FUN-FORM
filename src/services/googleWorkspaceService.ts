@@ -1,5 +1,7 @@
 import firebaseConfig from '../../firebase-applet-config.json';
 import { Survey, SurveyResponse, EmailMessageTemplate, EmailColorTheme } from '../types';
+import { auth, googleProvider } from '../firebase/config';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 export const OAUTH_CLIENT_ID = firebaseConfig.oAuthClientId || '1065688809566-u39c2jr8bdbr62iiqem2bdp4aj55fjf2.apps.googleusercontent.com';
 export const REQUIRED_SCOPES = [
@@ -63,42 +65,65 @@ export function getTokenMinutesRemaining(fallbackExpiry?: number): number {
   return Math.max(0, Math.floor(diffMs / 60000));
 }
 
-// Request access token via Google Identity Services
-export function requestGoogleAccessToken(
+// Request access token via Firebase Auth or Google Identity Services
+export async function requestGoogleAccessToken(
   onSuccess: (token: string) => void,
   onError?: (err: any) => void,
   hintEmail: string = 'grupoulep@gmail.com',
   prompt: string = ''
-): void {
-  if (typeof window === 'undefined' || !(window as any).google?.accounts?.oauth2) {
-    const errorMsg = 'Google Identity Services no está cargado aún en el navegador. Intente nuevamente en unos segundos.';
-    console.error(errorMsg);
-    if (onError) onError(new Error(errorMsg));
-    return;
+): Promise<void> {
+  // Method 1: Try Firebase Auth signInWithPopup (uses authDomain gen-lang-client-0359071638.firebaseapp.com to prevent origin mismatch)
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      saveGoogleToken(credential.accessToken, 3599);
+      onSuccess(credential.accessToken);
+      return;
+    }
+  } catch (firebaseErr: any) {
+    console.warn('Firebase Auth popup attempt:', firebaseErr?.code || firebaseErr?.message);
+    if (firebaseErr?.code === 'auth/popup-closed-by-user') {
+      if (onError) onError(new Error('Ventana de autorización cancelada por el usuario.'));
+      return;
+    }
   }
 
-  const client = (window as any).google.accounts.oauth2.initTokenClient({
-    client_id: OAUTH_CLIENT_ID,
-    scope: REQUIRED_SCOPES,
-    hint: hintEmail,
-    callback: (response: any) => {
-      if (response.error) {
-        console.error('Error al autorizar Google:', response);
-        if (onError) onError(response);
-        return;
-      }
-      if (response.access_token) {
-        saveGoogleToken(response.access_token, response.expires_in || 3599);
-        onSuccess(response.access_token);
-      }
-    },
-    error_callback: (nonOAuthErr: any) => {
-      console.error('Error en popup de Google OAuth:', nonOAuthErr);
-      if (onError) onError(nonOAuthErr);
-    },
-  });
+  // Method 2: Fallback to Google Identity Services client
+  if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+    try {
+      const client = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: OAUTH_CLIENT_ID,
+        scope: REQUIRED_SCOPES,
+        hint: hintEmail,
+        callback: (response: any) => {
+          if (response.error) {
+            console.error('Error al autorizar Google:', response);
+            if (onError) onError(response);
+            return;
+          }
+          if (response.access_token) {
+            saveGoogleToken(response.access_token, response.expires_in || 3599);
+            onSuccess(response.access_token);
+          }
+        },
+        error_callback: (nonOAuthErr: any) => {
+          console.error('Error en popup de Google OAuth:', nonOAuthErr);
+          if (onError) onError(nonOAuthErr);
+        },
+      });
 
-  client.requestAccessToken({ prompt });
+      client.requestAccessToken({ prompt });
+      return;
+    } catch (gisErr: any) {
+      console.error('Error al inicializar cliente GIS:', gisErr);
+      if (onError) onError(gisErr);
+      return;
+    }
+  }
+
+  const errorMsg = 'No se pudo inicializar la autenticación de Google en el navegador. Intente nuevamente en unos segundos.';
+  if (onError) onError(new Error(errorMsg));
 }
 
 // Attempts silent token refresh in the background without UI interruption
