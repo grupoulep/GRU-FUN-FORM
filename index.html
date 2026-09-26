@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+    <script>
+      // Automatic HTTPS enforcement to eliminate "not secure" connection warnings
+      if (typeof window !== 'undefined' && window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        window.location.href = window.location.href.replace('http:', 'https:');
+      }
+    </script>
     <title>Sistema de Encuestas GRUPO ULEP SAS</title>
     <meta name="description" content="Plataforma de gestión de encuestas, evaluación y respuestas en tiempo real para GRUPO ULEP SAS." />
     <meta property="og:title" content="Sistema de Encuestas GRUPO ULEP SAS" />

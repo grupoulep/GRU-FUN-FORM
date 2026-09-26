@@ -404,6 +404,21 @@ export const GoogleIntegrationsCard: React.FC<GoogleIntegrationsCardProps> = ({
         </div>
       </div>
 
+      {/* Security Guidance for Google OAuth Consent Screen */}
+      <div className="mx-6 mt-4 p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-900 text-xs">
+        <div className="flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="space-y-1">
+            <p className="font-semibold text-amber-950">
+              ¿Ves el aviso de Google: &ldquo;Esta aplicación no se ha verificado&rdquo; o &ldquo;Volver a un lugar seguro&rdquo;?
+            </p>
+            <p className="text-amber-800 text-2xs leading-relaxed">
+              Es el comportamiento normal de Google para apps internas sin auditoría pública. Para continuar de forma 100% segura: haz clic en <strong>&ldquo;Configuración avanzada&rdquo;</strong> (abajo a la izquierda en la ventana de Google) y luego en <strong>&ldquo;Ir a Sistema de Encuestas (no seguro)&rdquo;</strong> para autorizar la sincronización de Sheets y correos por Gmail.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Notifications / Alerts */}
       {successMessage && (
         <div className="mx-6 mt-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2 animate-in fade-in">
@@ -442,7 +457,7 @@ export const GoogleIntegrationsCard: React.FC<GoogleIntegrationsCardProps> = ({
           </div>
 
           <p className="text-xs text-slate-600 leading-relaxed">
-            Cada vez que un participante o auxiliar envíe una respuesta, se añadirá automáticamente una fila con los datos en tu hoja de Google Sheets.
+            Cada vez que un participante envíe una respuesta o realices una prueba administrativa, se añadirá automáticamente una fila con los datos en tu hoja de Google Sheets.
           </p>
 
           <div className="space-y-3 pt-2">
