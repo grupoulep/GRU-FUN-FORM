@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Survey, Auxiliary, SurveyResponse, CurrentUser, PlatformSettings } from './types';
+import { Survey, SurveyResponse, CurrentUser, PlatformSettings } from './types';
 import {
   getStoredSurveys,
   saveStoredSurveys,
-  getStoredAuxiliaries,
-  saveStoredAuxiliaries,
   getStoredResponses,
   saveStoredResponses,
   getStoredPlatformSettings,
@@ -15,9 +13,6 @@ import {
   subscribeToSurveys,
   saveSurveyToFirestore,
   deleteSurveyFromFirestore,
-  subscribeToAuxiliaries,
-  saveAuxiliaryToFirestore,
-  deleteAuxiliaryFromFirestore,
   subscribeToSurveyResponses,
   addSurveyResponseToFirestore,
   deleteSurveyResponseFromFirestore,
@@ -30,12 +25,17 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { LoginScreen } from './components/LoginScreen';
 import { ParticipantSurveyView } from './components/ParticipantSurveyView';
 import { AdminPanel } from './components/AdminPanel';
-import { AuxiliaryView } from './components/AuxiliaryView';
 import { AlertCircle, HelpCircle, ArrowLeft, ClipboardX } from 'lucide-react';
+import {
+  getSavedGoogleToken,
+  appendResponseToGoogleSheet,
+  sendInstantSurveyEmail,
+  isTokenExpiringSoon,
+  attemptSilentTokenRenewal,
+} from './services/googleWorkspaceService';
 
 export default function App() {
   const [surveys, setSurveys] = useState<Survey[]>(() => getStoredSurveys());
-  const [auxiliaries, setAuxiliaries] = useState<Auxiliary[]>(() => getStoredAuxiliaries());
   const [responses, setResponses] = useState<SurveyResponse[]>(() => getStoredResponses());
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(() => getStoredPlatformSettings());
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -54,7 +54,7 @@ export default function App() {
       if (firebaseUser) {
         if (firebaseUser.email === 'grupoulep@gmail.com') {
           setCurrentUser({
-            name: firebaseUser.displayName || firebaseUser.email || 'ADMINIULEP',
+            name: firebaseUser.displayName || firebaseUser.email || 'ADMIN ULEP',
             role: 'admin',
           });
           seedInitialFirestoreData();
@@ -66,12 +66,6 @@ export default function App() {
     const unsubSurveys = subscribeToSurveys((remoteSurveys) => {
       if (remoteSurveys && remoteSurveys.length > 0) {
         setSurveys(remoteSurveys);
-      }
-    });
-
-    const unsubAux = subscribeToAuxiliaries((remoteAux) => {
-      if (remoteAux && remoteAux.length > 0) {
-        setAuxiliaries(remoteAux);
       }
     });
 
@@ -90,7 +84,6 @@ export default function App() {
     return () => {
       unsubscribeAuth();
       unsubSurveys();
-      unsubAux();
       unsubResponses();
       unsubSettings();
     };
@@ -100,10 +93,6 @@ export default function App() {
   useEffect(() => {
     saveStoredSurveys(surveys);
   }, [surveys]);
-
-  useEffect(() => {
-    saveStoredAuxiliaries(auxiliaries);
-  }, [auxiliaries]);
 
   useEffect(() => {
     saveStoredResponses(responses);
@@ -116,6 +105,46 @@ export default function App() {
     }
   }, [platformSettings]);
 
+  // Automatic silent token renewal (every 50 minutes or whenever expiring in less than 10 min)
+  useEffect(() => {
+    const checkAndRenewToken = () => {
+      const integration = platformSettings?.googleIntegration;
+      const existingToken = getSavedGoogleToken(integration?.accessToken, integration?.tokenExpiry);
+      if (!existingToken) return;
+
+      if (isTokenExpiringSoon(10, integration?.tokenExpiry)) {
+        console.log('Verificando token de Google Workspace: Expira pronto. Renovando silenciosamente en segundo plano...');
+        attemptSilentTokenRenewal(
+          (newToken) => {
+            const expiry = Date.now() + 3599 * 1000;
+            const updated: PlatformSettings = {
+              ...platformSettings,
+              googleIntegration: {
+                ...platformSettings?.googleIntegration,
+                accessToken: newToken,
+                tokenExpiry: expiry,
+              },
+            };
+            setPlatformSettings(updated);
+            saveStoredPlatformSettings(updated);
+            savePlatformSettingsToFirestore(updated).catch(() => {});
+          },
+          () => {
+            console.log('Renovación automática silenciosa en espera.');
+          },
+          integration?.notificationEmail || 'grupoulep@gmail.com'
+        );
+      }
+    };
+
+    // Check immediately on mount/update
+    checkAndRenewToken();
+
+    // Check periodically every 2 minutes
+    const interval = setInterval(checkAndRenewToken, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [platformSettings]);
+
   // Primary active survey for regular participants
   const primaryActiveSurvey = useMemo(() => {
     const primary = surveys.find((s) => s.isActive && s.isPrimaryActive);
@@ -124,38 +153,25 @@ export default function App() {
   }, [surveys]);
 
   // Login handler
-  const handleLogin = (rawInput: string) => {
+  const handleLogin = (rawInput: string, rawEmail?: string) => {
     const trimmed = rawInput.trim();
     if (!trimmed) return;
 
-    // 1. Check for ADMINIULEP (Case-insensitive) -> Full Admin Privileges
-    if (trimmed.toUpperCase() === 'ADMINIULEP' || trimmed.toUpperCase() === 'ADMINIOLEP') {
+    // 1. Check for ADMINULEP or ADMINIULEP (Case-insensitive) -> Full Admin Privileges
+    const upperInput = trimmed.toUpperCase();
+    if (upperInput === 'ADMINULEP' || upperInput === 'ADMINIULEP' || upperInput === 'ADMINIOLEP') {
       setCurrentUser({
-        name: 'ADMINIULEP',
+        name: 'ADMIN ULEP',
+        email: rawEmail?.trim() || 'grupoulep@gmail.com',
         role: 'admin',
       });
       return;
     }
 
-    // 2. Check if it matches an Auxiliary's access code or name
-    const matchedAux = auxiliaries.find(
-      (a) =>
-        a.accessCode.toUpperCase() === trimmed.toUpperCase() ||
-        a.name.toLowerCase() === trimmed.toLowerCase()
-    );
-
-    if (matchedAux) {
-      setCurrentUser({
-        name: matchedAux.name,
-        role: 'auxiliary',
-        auxiliaryData: matchedAux,
-      });
-      return;
-    }
-
-    // 3. Any other text enters the active survey as a participant
+    // 2. Regular participant with name and email
     setCurrentUser({
       name: trimmed,
+      email: rawEmail?.trim() || '',
       role: 'participant',
     });
   };
@@ -169,12 +185,14 @@ export default function App() {
   const handleGoogleLogin = (user: any) => {
     if (user.email === 'grupoulep@gmail.com') {
       setCurrentUser({
-        name: user.displayName || user.email || 'ADMINIULEP',
+        name: user.displayName || user.email || 'ADMIN ULEP',
+        email: user.email,
         role: 'admin',
       });
     } else {
       setCurrentUser({
         name: user.displayName || user.email || 'Participante',
+        email: user.email || '',
         role: 'participant',
       });
     }
@@ -184,6 +202,7 @@ export default function App() {
   const handleAddResponse = (
     surveyId: string,
     participantName: string,
+    participantEmail: string = '',
     answers: Record<string, any>,
     registeredBy: string = 'direct'
   ) => {
@@ -191,6 +210,7 @@ export default function App() {
       id: `resp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       surveyId,
       participantName,
+      participantEmail: participantEmail.trim(),
       submittedAt: new Date().toISOString(),
       answers,
       registeredBy,
@@ -200,6 +220,74 @@ export default function App() {
     addSurveyResponseToFirestore(newResponse).catch((err) => {
       console.warn('Firestore response write notice:', err);
     });
+
+    // Automatic Google Workspace dispatch (Sheets & Gmail)
+    const integration = platformSettings?.googleIntegration;
+    const googleToken = getSavedGoogleToken(
+      integration?.accessToken,
+      integration?.tokenExpiry
+    );
+    const matchingSurvey = surveys.find((s) => s.id === surveyId);
+
+    if (matchingSurvey && googleToken) {
+      // 1. Google Sheets sync
+      if (integration?.autoSyncSheets !== false && integration?.spreadsheetId) {
+        appendResponseToGoogleSheet(
+          googleToken,
+          integration.spreadsheetId,
+          matchingSurvey,
+          newResponse,
+          integration.sheetName || 'Respuestas'
+        ).catch((err) => {
+          console.warn('Auto-sync to Google Sheet notice:', err);
+        });
+      }
+
+      // 2. Instant thank-you email from grupoulep@gmail.com to participant
+      if (newResponse.participantEmail) {
+        sendInstantSurveyEmail(
+          googleToken,
+          newResponse.participantEmail,
+          matchingSurvey,
+          newResponse,
+          platformSettings.title || 'Sistema de Encuestas GRUPO ULEP SAS',
+          true,
+          platformSettings.emailTemplate,
+          platformSettings.institutionName || 'GRUPO ULEP SAS'
+        ).then(() => {
+          console.log('Thank-you email dispatched from grupoulep@gmail.com to participant:', newResponse.participantEmail);
+        }).catch((err) => {
+          console.warn('Participant thank-you email notice:', err);
+        });
+      }
+
+      // 3. Instant administrative notification to institution / admin
+      const adminNotifyEmail = integration?.notificationEmail?.trim() || 'grupoulep@gmail.com';
+      if (
+        integration?.autoSendEmailNotification !== false &&
+        adminNotifyEmail &&
+        adminNotifyEmail.toLowerCase() !== newResponse.participantEmail?.toLowerCase()
+      ) {
+        sendInstantSurveyEmail(
+          googleToken,
+          adminNotifyEmail,
+          matchingSurvey,
+          newResponse,
+          platformSettings.title || 'Sistema de Encuestas GRUPO ULEP SAS',
+          false,
+          platformSettings.emailTemplate,
+          platformSettings.institutionName || 'GRUPO ULEP SAS'
+        ).then(() => {
+          console.log('Institutional email dispatched to admin:', adminNotifyEmail);
+        }).catch((err) => {
+          console.warn('Institutional notification email notice:', err);
+        });
+      }
+    } else if (!googleToken) {
+      console.info(
+        'Google Workspace no está vinculado actualmente. Para enviar correos automáticos por Gmail API, vincula la cuenta en el Panel de Administración -> Google Sheets & Gmail.'
+      );
+    }
   };
 
   // Save survey (add or edit)
@@ -267,19 +355,7 @@ export default function App() {
     // 2. Remove ALL survey response records for this survey!
     setResponses((prev) => prev.filter((r) => r.surveyId !== surveyId));
 
-    // 3. Also remove from auxiliaries assigned list
-    setAuxiliaries((prev) =>
-      prev.map((a) => {
-        const updated = {
-          ...a,
-          assignedSurveyIds: a.assignedSurveyIds.filter((id) => id !== surveyId),
-        };
-        saveAuxiliaryToFirestore(updated).catch(() => {});
-        return updated;
-      })
-    );
-
-    // 4. Close preview if testing this survey
+    // 3. Close preview if testing this survey
     if (currentTestSurvey?.id === surveyId) {
       setCurrentTestSurvey(null);
     }
@@ -325,50 +401,26 @@ export default function App() {
     );
   };
 
-  // Save auxiliary
-  const handleSaveAuxiliary = (auxToSave: Auxiliary) => {
-    setAuxiliaries((prev) => {
-      const exists = prev.some((a) => a.id === auxToSave.id);
-      return exists ? prev.map((a) => (a.id === auxToSave.id ? auxToSave : a)) : [auxToSave, ...prev];
-    });
-    saveAuxiliaryToFirestore(auxToSave).catch(() => {});
-  };
-
-  // Delete auxiliary
-  const handleDeleteAuxiliary = (auxId: string) => {
-    setAuxiliaries((prev) => prev.filter((a) => a.id !== auxId));
-    deleteAuxiliaryFromFirestore(auxId).catch(() => {});
-  };
-
-  // Simulate logging in as an auxiliary
-  const handleSimulateLoginAsAux = (aux: Auxiliary) => {
-    setCurrentUser({
-      name: aux.name,
-      role: 'auxiliary',
-      auxiliaryData: aux,
-    });
-  };
-
   // Simulate a live participant response for instant real-time visualization
   const handleSimulateResponse = (surveyId: string, count: number = 1) => {
     const survey = surveys.find((s) => s.id === surveyId) || primaryActiveSurvey;
     if (!survey) return;
 
-    const sampleNames = [
-      'Martín Silva',
-      'Florencia Castro',
-      'Gabriel Ortiz',
-      'Beatriz Navas',
-      'Hernán Delgado',
-      'Alicia Pardo',
-      'Cristian Barrientos',
-      'Daniela Soto',
-      'Rodrigo Peña',
-      'Valeria Morales',
+    const sampleParticipants = [
+      { name: 'Martín Silva', email: 'martin.silva@gmail.com' },
+      { name: 'Florencia Castro', email: 'florencia.castro@grupoulep.com' },
+      { name: 'Gabriel Ortiz', email: 'gabriel.ortiz@outlook.com' },
+      { name: 'Beatriz Navas', email: 'b.navas@grupoulep.com' },
+      { name: 'Hernán Delgado', email: 'hernan.delgado@yahoo.com' },
+      { name: 'Alicia Pardo', email: 'alicia.pardo@gmail.com' },
+      { name: 'Cristian Barrientos', email: 'cbarrientos@gmail.com' },
+      { name: 'Daniela Soto', email: 'daniela.soto@grupoulep.com' },
+      { name: 'Rodrigo Peña', email: 'rodrigo.pena@hotmail.com' },
+      { name: 'Valeria Morales', email: 'valeria.morales@gmail.com' },
     ];
 
     for (let i = 0; i < count; i++) {
-      const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+      const participant = sampleParticipants[Math.floor(Math.random() * sampleParticipants.length)];
       const answers: Record<string, any> = {};
 
       survey.questions.forEach((q) => {
@@ -401,7 +453,7 @@ export default function App() {
         }
       });
 
-      handleAddResponse(survey.id, randomName, answers, 'Simulado en vivo');
+      handleAddResponse(survey.id, participant.name, participant.email, answers, 'Simulado en vivo');
     }
   };
 
@@ -409,7 +461,6 @@ export default function App() {
   const handleResetToDefaults = () => {
     resetToDefaultData();
     setSurveys(getStoredSurveys());
-    setAuxiliaries(getStoredAuxiliaries());
     setResponses(getStoredResponses());
     setPlatformSettings(getStoredPlatformSettings());
   };
@@ -443,7 +494,7 @@ export default function App() {
           />
         )}
 
-        {/* 2. Admin Role (ADMINIULEP) */}
+        {/* 2. Admin Role (ADMINULEP) */}
         {currentUser && currentUser.role === 'admin' && (
           <>
             {currentTestSurvey ? (
@@ -461,14 +512,16 @@ export default function App() {
                 <ParticipantSurveyView
                   survey={currentTestSurvey}
                   participantName="Administrador (Prueba)"
-                  registeredBy="ADMINIULEP"
+                  participantEmail={currentUser.email || 'grupoulep@gmail.com'}
+                  registeredBy="ADMIN ULEP"
                   platformSettings={platformSettings}
-                  onSubmit={(answers) => {
+                  onSubmit={(answers, info) => {
                     handleAddResponse(
                       currentTestSurvey.id,
-                      'Administrador (Prueba)',
+                      info?.name || 'Administrador (Prueba)',
+                      info?.email || currentUser.email || 'grupoulep@gmail.com',
                       answers,
-                      'ADMINIULEP'
+                      'ADMIN ULEP'
                     );
                   }}
                   onExit={() => setCurrentTestSurvey(null)}
@@ -477,7 +530,6 @@ export default function App() {
             ) : (
               <AdminPanel
                 surveys={surveys}
-                auxiliaries={auxiliaries}
                 responses={responses}
                 platformSettings={platformSettings}
                 onUpdatePlatformSettings={handleUpdatePlatformSettings}
@@ -486,9 +538,6 @@ export default function App() {
                 onDeleteSurvey={handleDeleteSurvey}
                 onToggleActive={handleToggleActive}
                 onSetPrimaryActive={handleSetPrimaryActive}
-                onSaveAuxiliary={handleSaveAuxiliary}
-                onDeleteAuxiliary={handleDeleteAuxiliary}
-                onSimulateLoginAsAux={handleSimulateLoginAsAux}
                 onTestSurveyAsParticipant={(s) => setCurrentTestSurvey(s)}
                 onSimulateResponse={handleSimulateResponse}
                 onResetToDefaults={handleResetToDefaults}
@@ -499,28 +548,23 @@ export default function App() {
           </>
         )}
 
-        {/* 3. Auxiliary Role */}
-        {currentUser && currentUser.role === 'auxiliary' && currentUser.auxiliaryData && (
-          <AuxiliaryView
-            auxiliary={currentUser.auxiliaryData}
-            surveys={surveys}
-            responses={responses}
-            platformSettings={platformSettings}
-            onAddResponse={handleAddResponse}
-            onExit={handleLogout}
-          />
-        )}
-
-        {/* 4. Participant Role (entered any other text/name) */}
+        {/* 3. Participant Role (entered name and email) */}
         {currentUser && currentUser.role === 'participant' && (
           <>
             {primaryActiveSurvey ? (
               <ParticipantSurveyView
                 survey={primaryActiveSurvey}
                 participantName={currentUser.name}
+                participantEmail={currentUser.email || ''}
                 platformSettings={platformSettings}
-                onSubmit={(answers) => {
-                  handleAddResponse(primaryActiveSurvey.id, currentUser.name, answers, 'direct');
+                onSubmit={(answers, info) => {
+                  handleAddResponse(
+                    primaryActiveSurvey.id,
+                    info?.name || currentUser.name,
+                    info?.email || currentUser.email || '',
+                    answers,
+                    'direct'
+                  );
                 }}
                 onExit={handleLogout}
               />

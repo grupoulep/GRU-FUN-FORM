@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'auxiliary' | 'participant';
+export type UserRole = 'admin' | 'participant';
 
 export type QuestionType = 'single' | 'multiple' | 'rating' | 'text' | 'yesno' | 'dropdown' | 'nps' | 'date';
 
@@ -26,32 +26,80 @@ export interface Survey {
   questions: Question[];
 }
 
-export interface Auxiliary {
-  id: string;
-  name: string;
-  accessCode: string;
-  department: string;
-  assignedSurveyIds: string[];
-  createdAt: string;
-}
-
 export interface SurveyResponse {
   id: string;
   surveyId: string;
   participantName: string;
+  participantEmail?: string;
   submittedAt: string;
   answers: Record<string, any>; // questionId -> answer (string, string[], number)
-  registeredBy?: string; // auxiliary name or 'direct'
+  registeredBy?: string; // e.g. 'ADMIN' or 'Directo'
 }
 
 export interface CurrentUser {
   name: string;
+  email?: string;
   role: UserRole;
-  auxiliaryData?: Auxiliary;
+}
+
+export interface GoogleIntegrationSettings {
+  spreadsheetId?: string;
+  sheetName?: string;
+  autoSyncSheets?: boolean;
+  notificationEmail?: string;
+  autoSendEmailNotification?: boolean;
+  emailSubjectTemplate?: string;
+  accessToken?: string;
+  tokenExpiry?: number;
+}
+
+export interface EmailColorTheme {
+  presetId?: string;
+  useGradient?: boolean;
+  bannerGradientStart?: string;
+  bannerGradientMid?: string;
+  bannerGradientEnd?: string;
+  bannerGradientAngle?: number;
+  bannerSolidColor?: string;
+  bannerTitleColor?: string;
+  bannerSubtitleColor?: string;
+  badgeBgColor?: string;
+  badgeTextColor?: string;
+  cardBgColor?: string;
+  outerBgColor?: string;
+  primaryAccentColor?: string;
+  greetingColor?: string;
+  bodyTextColor?: string;
+  metaBoxBgColor?: string;
+  metaBoxBorderColor?: string;
+  tableHeaderBg?: string;
+  tableHeaderTextColor?: string;
+  tableAltRowBg?: string;
+  footerNoticeBg?: string;
+  footerNoticeBorder?: string;
+  footerTextColor?: string;
+}
+
+export interface EmailMessageTemplate {
+  subjectTemplate?: string;
+  badgeText?: string;
+  headerTitle?: string;
+  headerSubtitle?: string;
+  greeting?: string;
+  mainMessage?: string;
+  secondaryMessage?: string;
+  includeMetaBox?: boolean;
+  includeResponsesTable?: boolean;
+  tableTitle?: string;
+  footerNotice?: string;
+  signature?: string;
+  colors?: EmailColorTheme;
 }
 
 export interface PlatformSettings {
   title: string;
   subtitle?: string;
   institutionName?: string;
+  googleIntegration?: GoogleIntegrationSettings;
+  emailTemplate?: EmailMessageTemplate;
 }

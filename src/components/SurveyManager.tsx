@@ -35,7 +35,7 @@ const SURVEY_TEMPLATES: {
   {
     title: 'Evaluación de Atención y Calidad de Servicio',
     description: 'Medición de la experiencia del usuario, tiempos de respuesta y amabilidad del personal.',
-    category: 'Calidad Institucional',
+    category: 'Calidad de Servicio',
     questions: [
       {
         id: 't_q1',
@@ -51,7 +51,7 @@ const SURVEY_TEMPLATES: {
         title: '¿Por cuál canal se comunicó o realizó su trámite?',
         type: 'dropdown',
         required: true,
-        options: ['Ventanilla Presencial', 'Línea Telefónica', 'Portal Web Institucional', 'WhatsApp Oficial', 'Correo Electrónico'],
+        options: ['Atención Presencial', 'Línea Telefónica', 'Portal Web Oficial', 'WhatsApp Oficial', 'Correo Electrónico'],
       },
       {
         id: 't_q3',
@@ -130,7 +130,7 @@ const SURVEY_TEMPLATES: {
         title: 'Área funcional o coordinación a la que pertenece:',
         type: 'dropdown',
         required: true,
-        options: ['Dirección General', 'Coordinación Académica', 'Sistemas e Infraestructura', 'Atención al Usuario', 'Operaciones y Logística'],
+        options: ['Dirección General', 'Gestión Comercial y Proyectos', 'Sistemas y Tecnología', 'Atención al Cliente', 'Operaciones y Logística'],
       },
       {
         id: 't_q2',
@@ -149,13 +149,13 @@ const SURVEY_TEMPLATES: {
       },
       {
         id: 't_q4',
-        title: '¿Qué tan probable es que recomiende trabajar en la institución (eNPS)?',
+        title: '¿Qué tan probable es que recomiende trabajar en GRUPO ULEP SAS (eNPS)?',
         type: 'nps',
         required: true,
       },
       {
         id: 't_q5',
-        title: '¿Qué iniciativa institucional aumentaría más su bienestar diario?',
+        title: '¿Qué iniciativa en la empresa aumentaría más su bienestar diario?',
         type: 'text',
         required: false,
       }
@@ -264,7 +264,7 @@ export const SurveyManager: React.FC<SurveyManagerProps> = ({
     setEditingSurvey(null);
     setFormTitle('');
     setFormDescription('');
-    setFormCategory('Calidad Institucional');
+    setFormCategory('Calidad de Servicio');
     setFormIsActive(true);
     setFormIsPrimary(surveys.length === 0);
     setFormQuestions([
@@ -722,7 +722,7 @@ export const SurveyManager: React.FC<SurveyManagerProps> = ({
                       type="text"
                       value={formCategory}
                       onChange={(e) => setFormCategory(e.target.value)}
-                      placeholder="Ej: Calidad Institucional, Formación..."
+                      placeholder="Ej: Calidad de Servicio, Clima Laboral, Proyectos..."
                       className="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800"
                     />
                   </div>

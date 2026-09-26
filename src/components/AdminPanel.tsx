@@ -1,30 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { Survey, Auxiliary, SurveyResponse, PlatformSettings } from '../types';
+import { Survey, SurveyResponse, PlatformSettings } from '../types';
 import { RealtimeReports } from './RealtimeReports';
 import { SurveyManager } from './SurveyManager';
-import { AuxiliaryManager } from './AuxiliaryManager';
+import { GoogleIntegrationsCard } from './GoogleIntegrationsCard';
+import { EmailTemplateEditor } from './EmailTemplateEditor';
 import { 
   BarChart3, 
   ClipboardList, 
-  Users, 
   Settings, 
   ShieldCheck, 
   Sparkles, 
   RotateCcw, 
   FileSpreadsheet,
-  Download,
   CheckCircle2,
-  Lock,
   LogOut,
   Pencil,
   Sliders,
-  Building2,
-  Flame
+  Flame,
+  Zap,
+  Menu,
+  X,
+  Activity,
+  Layers,
+  ChevronRight,
+  Mail
 } from 'lucide-react';
 
 interface AdminPanelProps {
   surveys: Survey[];
-  auxiliaries: Auxiliary[];
   responses: SurveyResponse[];
   platformSettings?: PlatformSettings;
   onUpdatePlatformSettings?: (settings: PlatformSettings) => void;
@@ -33,9 +36,6 @@ interface AdminPanelProps {
   onDeleteSurvey: (surveyId: string) => void;
   onToggleActive: (surveyId: string) => void;
   onSetPrimaryActive: (surveyId: string) => void;
-  onSaveAuxiliary: (aux: Auxiliary) => void;
-  onDeleteAuxiliary: (auxId: string) => void;
-  onSimulateLoginAsAux: (aux: Auxiliary) => void;
   onTestSurveyAsParticipant: (survey: Survey) => void;
   onSimulateResponse: (surveyId: string, count?: number) => void;
   onResetToDefaults: () => void;
@@ -43,9 +43,10 @@ interface AdminPanelProps {
   onDeleteResponse?: (responseId: string) => void;
 }
 
+type TabType = 'reports' | 'surveys' | 'email' | 'google' | 'settings';
+
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   surveys,
-  auxiliaries,
   responses,
   platformSettings,
   onUpdatePlatformSettings,
@@ -54,23 +55,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onDeleteSurvey,
   onToggleActive,
   onSetPrimaryActive,
-  onSaveAuxiliary,
-  onDeleteAuxiliary,
-  onSimulateLoginAsAux,
   onTestSurveyAsParticipant,
   onSimulateResponse,
   onResetToDefaults,
   onClearResponses,
   onDeleteResponse,
 }) => {
-  const [activeTab, setActiveTab] = useState<'reports' | 'surveys' | 'auxiliaries' | 'settings'>('reports');
+  const [activeTab, setActiveTab] = useState<TabType>('reports');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'reset' | 'clear' | null>(null);
 
   // Platform Title Form State
   const [titleForm, setTitleForm] = useState<PlatformSettings>({
-    title: platformSettings?.title || 'Sistema de Encuestas IULEP',
-    subtitle: platformSettings?.subtitle || 'Instituto Universitario Latinoamericano de Posgrado',
-    institutionName: platformSettings?.institutionName || 'IULEP',
+    title: platformSettings?.title || 'Sistema de Encuestas GRUPO ULEP SAS',
+    subtitle: platformSettings?.subtitle || 'Gestión y Evaluación de Servicios - GRUPO ULEP SAS',
+    institutionName: platformSettings?.institutionName || 'GRUPO ULEP SAS',
   });
   const [titleSavedNotification, setTitleSavedNotification] = useState(false);
   const [showTitleModal, setShowTitleModal] = useState(false);
@@ -78,7 +77,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   useEffect(() => {
     if (platformSettings) {
       setTitleForm({
-        title: platformSettings.title || 'Sistema de Encuestas IULEP',
+        title: platformSettings.title || 'Sistema de Encuestas GRUPO ULEP SAS',
         subtitle: platformSettings.subtitle || '',
         institutionName: platformSettings.institutionName || '',
       });
@@ -102,9 +101,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleResetTitleToDefault = () => {
     const defaultVals: PlatformSettings = {
-      title: 'Sistema de Encuestas IULEP',
-      subtitle: 'Instituto Universitario Latinoamericano de Posgrado',
-      institutionName: 'IULEP',
+      title: 'Sistema de Encuestas GRUPO ULEP SAS',
+      subtitle: 'Gestión y Evaluación de Servicios - GRUPO ULEP SAS',
+      institutionName: 'GRUPO ULEP SAS',
     };
     setTitleForm(defaultVals);
     if (onUpdatePlatformSettings) {
@@ -114,394 +113,625 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setTitleSavedNotification(false), 3000);
   };
 
-  // Total metrics
+  // Metrics
   const totalResponses = responses.length;
   const activeSurveysCount = surveys.filter((s) => s.isActive).length;
-  const totalAuxiliaries = auxiliaries.length;
 
-  const currentPlatformTitle = platformSettings?.title || 'Sistema de Encuestas IULEP';
-  const currentPlatformSubtitle = platformSettings?.subtitle || 'Instituto Universitario Latinoamericano de Posgrado';
+  const currentPlatformTitle = platformSettings?.title || 'Sistema de Encuestas GRUPO ULEP SAS';
+  const currentInstitution = platformSettings?.institutionName || 'GRUPO ULEP SAS';
+
+  const navItems: {
+    id: TabType;
+    label: string;
+    description: string;
+    icon: React.ElementType;
+    badge?: string;
+  }[] = [
+    {
+      id: 'reports',
+      label: 'Reportes en Tiempo Real',
+      description: 'Métricas, análisis y gráficas en vivo',
+      icon: BarChart3,
+      badge: `${totalResponses} respuestas`,
+    },
+    {
+      id: 'surveys',
+      label: 'Gestión de Encuestas',
+      description: 'Crear, editar y activar cuestionarios',
+      icon: ClipboardList,
+      badge: `${surveys.length} (${activeSurveysCount} activas)`,
+    },
+    {
+      id: 'email',
+      label: 'Mensaje de Correo',
+      description: 'Edición completa del mensaje al participante',
+      icon: Mail,
+      badge: 'Gmail API',
+    },
+    {
+      id: 'google',
+      label: 'Google Sheets & Gmail',
+      description: 'Sincronización en la nube y correos',
+      icon: Zap,
+      badge: 'Workspace',
+    },
+    {
+      id: 'settings',
+      label: 'Título & Configuración',
+      description: 'Identidad corporativa y mantenimiento',
+      icon: Settings,
+    },
+  ];
+
+  const currentNav = navItems.find((n) => n.id === activeTab) || navItems[0];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Top Banner with Platform Title, Admin Badge & Quick Stats */}
-      <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-indigo-950/20 border border-indigo-700/40 relative overflow-hidden">
-        {/* Subtle decorative background circle */}
-        <div className="absolute -right-12 -top-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
-                ADMINIULEP • Privilegios Totales
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-200 border border-amber-400/30">
-                <Flame className="w-3.5 h-3.5 text-amber-400" />
-                Firebase Cloud Firestore • Sincronizado
-              </span>
-              <button
-                onClick={() => setShowTitleModal(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white border border-white/15 transition-colors cursor-pointer"
-                title="Cambiar el título de la plataforma de encuestas"
-              >
-                <Pencil className="w-3 h-3" />
-                <span>Poner Título a la Plataforma</span>
-              </button>
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
+      {/* ============================================================ */}
+      {/* 1. LEFT SIDEBAR (PANELES DE ADMIN EN EL LADO IZQUIERDO)      */}
+      {/* ============================================================ */}
+      <aside className="hidden lg:flex lg:flex-col lg:w-72 xl:w-80 bg-slate-900 text-slate-100 border-r border-slate-800 shrink-0 sticky top-0 h-screen overflow-y-auto">
+        {/* Brand & System Header */}
+        <div className="p-6 border-b border-slate-800/80">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-black text-lg shadow-md shadow-indigo-600/30 shrink-0">
+              U
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-3">
-              <span>{currentPlatformTitle}</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-indigo-200 mt-1 max-w-2xl">
-              {currentPlatformSubtitle ? `${currentPlatformSubtitle} • ` : ''}Supervise reportes analíticos en tiempo real, configure encuestas y asigne permisos a auxiliares.
-            </p>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold uppercase tracking-wider text-indigo-400 truncate">
+                {currentInstitution}
+              </div>
+              <h2 className="text-sm font-bold text-white truncate leading-tight">
+                {currentPlatformTitle}
+              </h2>
+            </div>
           </div>
 
-          {/* Quick Metrics Pills & Logout */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 text-center">
-              <span className="block text-xl font-extrabold text-white">{activeSurveysCount}</span>
-              <span className="text-2xs uppercase tracking-wider text-indigo-200">Encuestas Activas</span>
+          {/* Admin badge & Firestore live status */}
+          <div className="mt-4 pt-3 border-t border-slate-800/60 flex flex-col gap-1.5 text-2xs">
+            <div className="flex items-center gap-1.5 text-indigo-300 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+              <span>ADMIN ULEP • Privilegios Totales</span>
             </div>
-            <div className="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 text-center">
-              <span className="block text-xl font-extrabold text-white">{totalResponses}</span>
-              <span className="text-2xs uppercase tracking-wider text-indigo-200">Respuestas Vivas</span>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Cloud Firestore • Sincronizado en Vivo</span>
             </div>
-            <div className="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 text-center">
-              <span className="block text-xl font-extrabold text-white">{totalAuxiliaries}</span>
-              <span className="text-2xs uppercase tracking-wider text-indigo-200">Auxiliares</span>
+          </div>
+        </div>
+
+        {/* Quick Metrics Bar */}
+        <div className="px-6 py-4 bg-slate-950/40 border-b border-slate-800/80 grid grid-cols-2 gap-2 text-center">
+          <div className="p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50">
+            <span className="block text-base font-extrabold text-white">{activeSurveysCount}</span>
+            <span className="text-3xs uppercase tracking-wider text-slate-400">Encuestas Activas</span>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50">
+            <span className="block text-base font-extrabold text-indigo-400">{totalResponses}</span>
+            <span className="text-3xs uppercase tracking-wider text-slate-400">Respuestas Totales</span>
+          </div>
+        </div>
+
+        {/* Navigation Sections */}
+        <div className="flex-1 px-4 py-5 space-y-6">
+          <div>
+            <div className="px-3 mb-2 text-3xs font-extrabold uppercase tracking-widest text-slate-400">
+              Paneles de Control
             </div>
-            {onLogout && (
+
+            <nav className="space-y-1.5" aria-label="Paneles de administración">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full text-left p-3 rounded-xl transition-all flex items-start gap-3 cursor-pointer group ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                    }`}
+                  >
+                    <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${
+                      isActive ? 'bg-indigo-700 text-white' : 'bg-slate-800 text-slate-400 group-hover:text-white'
+                    }`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className={`text-xs font-bold leading-tight truncate ${isActive ? 'text-white' : 'text-slate-200'}`}>
+                          {item.label}
+                        </span>
+                        {item.badge && (
+                          <span className={`text-3xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                            isActive
+                              ? 'bg-indigo-800/80 text-indigo-100'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700/60'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-2xs truncate mt-0.5 ${isActive ? 'text-indigo-200' : 'text-slate-400'}`}>
+                        {item.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+
+        {/* Sidebar Footer Actions */}
+        <div className="p-4 border-t border-slate-800/80 space-y-2 bg-slate-950/30">
+          <button
+            onClick={() => setShowTitleModal(true)}
+            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer border border-slate-700/60"
+            title="Editar el título que verán los participantes"
+          >
+            <Pencil className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Editar Título del Sistema</span>
+          </button>
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="w-full px-3.5 py-2 rounded-xl text-slate-400 hover:text-red-300 hover:bg-red-500/10 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Cerrar Sesión</span>
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ============================================================ */}
+      {/* 2. MOBILE TOP BAR & DRAWER (FOR PHONES AND TABLETS)          */}
+      {/* ============================================================ */}
+      <div className="lg:hidden bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+              U
+            </div>
+            <div className="min-w-0">
+              <div className="text-2xs text-indigo-300 font-bold uppercase truncate">
+                {currentInstitution}
+              </div>
+              <div className="text-xs font-bold text-white truncate">
+                {currentNav.label}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTitleModal(true)}
+              className="p-2 rounded-lg bg-slate-800 text-indigo-300 hover:text-white text-xs"
+              title="Editar título"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:text-white"
+              aria-label="Abrir menú de paneles"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Horizontal Fast Tabs */}
+        <div className="px-3 pb-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-t border-slate-800/60 pt-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
               <button
-                onClick={onLogout}
-                className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-red-500/80 text-white text-xs font-bold transition-all border border-white/15 flex items-center gap-2 cursor-pointer shadow-sm"
-                title="Cerrar sesión"
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setMobileMenuOpen(false);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 flex items-center gap-1.5 transition-colors ${
+                  isActive
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-800/80 text-slate-300 hover:text-white'
+                }`}
               >
-                <LogOut className="w-4 h-4" />
-                <span>Salir</span>
+                <Icon className="w-3.5 h-3.5" />
+                <span>{item.label}</span>
               </button>
+            );
+          })}
+        </div>
+
+        {/* Mobile slide-down drawer if opened */}
+        {mobileMenuOpen && (
+          <div className="p-4 border-t border-slate-800 bg-slate-950 space-y-3 animate-in fade-in slide-in-from-top-2">
+            <div className="text-2xs font-bold uppercase text-slate-400">
+              Seleccionar Panel de Administración
+            </div>
+            <div className="space-y-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`w-full p-2.5 rounded-xl text-left flex items-center justify-between text-xs font-semibold ${
+                      isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="w-4 h-4" />
+                      {item.label}
+                    </span>
+                    {item.badge && (
+                      <span className="text-3xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {onLogout && (
+              <div className="pt-2 border-t border-slate-800">
+                <button
+                  onClick={onLogout}
+                  className="w-full py-2 text-center text-xs font-semibold text-rose-400 hover:text-rose-300"
+                >
+                  Cerrar Sesión
+                </button>
+              </div>
             )}
           </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="mt-8 pt-4 border-t border-indigo-700/40 flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'reports'
-                ? 'bg-white text-indigo-950 shadow-md'
-                : 'text-indigo-200 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Reportes en Tiempo Real</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('surveys')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'surveys'
-                ? 'bg-white text-indigo-950 shadow-md'
-                : 'text-indigo-200 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <ClipboardList className="w-4 h-4" />
-            <span>Gestión de Encuestas ({surveys.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('auxiliaries')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'auxiliaries'
-                ? 'bg-white text-indigo-950 shadow-md'
-                : 'text-indigo-200 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Módulo de Auxiliares ({auxiliaries.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === 'settings'
-                ? 'bg-white text-indigo-950 shadow-md'
-                : 'text-indigo-200 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            <span>Título & Configuración</span>
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Tab Content Display */}
-      <div>
-        {activeTab === 'reports' && (
-          <RealtimeReports
-            surveys={surveys}
-            responses={responses}
-            onSimulateResponse={onSimulateResponse}
-            onDeleteResponse={onDeleteResponse}
-          />
-        )}
-
-        {activeTab === 'surveys' && (
-          <SurveyManager
-            surveys={surveys}
-            responses={responses}
-            onSaveSurvey={onSaveSurvey}
-            onDeleteSurvey={onDeleteSurvey}
-            onToggleActive={onToggleActive}
-            onSetPrimaryActive={onSetPrimaryActive}
-            onTestSurvey={onTestSurveyAsParticipant}
-          />
-        )}
-
-        {activeTab === 'auxiliaries' && (
-          <AuxiliaryManager
-            auxiliaries={auxiliaries}
-            surveys={surveys}
-            onSaveAuxiliary={onSaveAuxiliary}
-            onDeleteAuxiliary={onDeleteAuxiliary}
-            onSimulateLoginAsAux={onSimulateLoginAsAux}
-          />
-        )}
-
-        {activeTab === 'settings' && (
-          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-6">
-            {/* 1. TÍTULO E IDENTIDAD DE LA PLATAFORMA DE ENCUESTAS */}
-            <div className="p-6 rounded-2xl border-2 border-indigo-200/80 bg-gradient-to-br from-indigo-50/60 via-white to-slate-50 space-y-5 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                    <Sliders className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900">
-                      Título e Identidad de la Plataforma de Encuestas
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Personalice el nombre oficial y subtítulo institucional que verán los participantes, auxiliares y administradores.
-                    </p>
-                  </div>
-                </div>
-
-                {titleSavedNotification && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse self-start sm:self-auto">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>¡Título guardado con éxito!</span>
-                  </span>
-                )}
+      {/* ============================================================ */}
+      {/* 3. RIGHT MAIN CONTENT AREA                                   */}
+      {/* ============================================================ */}
+      <main className="flex-1 min-w-0 flex flex-col">
+        {/* Top Header of the Active Panel */}
+        <header className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-5">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                <currentNav.icon className="w-5 h-5" />
               </div>
-
-              <form onSubmit={handleSavePlatformTitle} className="space-y-4 pt-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Título Principal */}
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Título de la Plataforma de Encuestas <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={titleForm.title}
-                      onChange={(e) => setTitleForm({ ...titleForm, title: e.target.value })}
-                      placeholder="Ej: Sistema de Encuestas IULEP / Encuestas de Satisfacción 2026"
-                      className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm font-semibold text-slate-900 transition-all shadow-xs"
-                      required
-                    />
-                    <p className="text-2xs text-slate-500 mt-1">
-                      Este título aparecerá en el encabezado del sistema, en la pantalla de ingreso para participantes, en la pestaña del navegador y en los encabezados de cuestionarios.
-                    </p>
-                  </div>
-
-                  {/* Subtítulo */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Subtítulo o Entidad Patrocinante
-                    </label>
-                    <input
-                      type="text"
-                      value={titleForm.subtitle || ''}
-                      onChange={(e) => setTitleForm({ ...titleForm, subtitle: e.target.value })}
-                      placeholder="Ej: Instituto Universitario Latinoamericano de Posgrado"
-                      className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 transition-all shadow-xs"
-                    />
-                  </div>
-
-                  {/* Siglas / Nombre Corto */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                      Siglas o Nombre Corto Institucional
-                    </label>
-                    <input
-                      type="text"
-                      value={titleForm.institutionName || ''}
-                      onChange={(e) => setTitleForm({ ...titleForm, institutionName: e.target.value })}
-                      placeholder="Ej: IULEP"
-                      className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 transition-all shadow-xs"
-                    />
-                  </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
+                    {currentNav.label}
+                  </h1>
+                  {currentNav.badge && (
+                    <span className="hidden sm:inline-block text-2xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      {currentNav.badge}
+                    </span>
+                  )}
                 </div>
-
-                {/* Vista Previa en Vivo */}
-                <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2 shadow-xs">
-                  <div className="text-2xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Vista Previa en Vivo (Encabezado y Pantalla de Ingreso):</span>
-                  </div>
-                  <div className="flex items-center gap-3.5 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
-                      <ClipboardList className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-black text-slate-900 leading-snug">
-                        {titleForm.title.trim() || '(Sin título)'}
-                      </div>
-                      {titleForm.subtitle && (
-                        <div className="text-xs text-slate-500 font-medium">
-                          {titleForm.subtitle}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botones de acción */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleResetTitleToDefault}
-                    className="text-xs text-slate-500 hover:text-indigo-600 font-semibold transition-colors cursor-pointer"
-                  >
-                    Restaurar Título Predeterminado (IULEP)
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2 cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Guardar Título de la Plataforma</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Mantenimiento, Respaldo y Persistencia
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Opciones avanzadas para respaldar, resetear datos de demostración o gestionar la memoria local.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              {/* Reset to defaults */}
-              <div className="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-                <div className="flex items-center gap-2.5 text-slate-900 font-bold text-sm">
-                  <RotateCcw className="w-4 h-4 text-indigo-600" />
-                  <span>Restaurar Datos Iniciales de Demostración</span>
-                </div>
-                <p className="text-xs text-slate-600">
-                  Restaura las 3 encuestas preconfiguradas, los 3 auxiliares de ejemplo y las 10 respuestas analíticas iniciales para pruebas.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {currentNav.description}
                 </p>
-                <button
-                  onClick={() => setConfirmAction('reset')}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs"
-                >
-                  Restaurar Valores por Defecto
-                </button>
-              </div>
-
-              {/* Clear responses */}
-              <div className="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-                <div className="flex items-center gap-2.5 text-slate-900 font-bold text-sm">
-                  <FileSpreadsheet className="w-4 h-4 text-rose-600" />
-                  <span>Limpiar Respuestas de Encuestas</span>
-                </div>
-                <p className="text-xs text-slate-600">
-                  Conserva las encuestas y auxiliares pero reinicia el contador de respuestas a 0 para empezar un sondeo completamente limpio.
-                </p>
-                <button
-                  onClick={() => setConfirmAction('clear')}
-                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold cursor-pointer"
-                >
-                  Vaciar Respuestas Registradas
-                </button>
               </div>
             </div>
 
-            {/* In-app confirmation modal for Maintenance */}
-            {confirmAction && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-                <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-2.5 self-start sm:self-auto">
+              <button
+                onClick={() => setShowTitleModal(true)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                title="Personalizar título de la plataforma"
+              >
+                <Pencil className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden md:inline">Título de Plataforma</span>
+              </button>
+
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Tiempo Real</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Container */}
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {/* TAB 1: REPORTES */}
+          {activeTab === 'reports' && (
+            <RealtimeReports
+              surveys={surveys}
+              responses={responses}
+              onSimulateResponse={onSimulateResponse}
+              onDeleteResponse={onDeleteResponse}
+            />
+          )}
+
+          {/* TAB 2: GESTIÓN DE ENCUESTAS */}
+          {activeTab === 'surveys' && (
+            <SurveyManager
+              surveys={surveys}
+              responses={responses}
+              onSaveSurvey={onSaveSurvey}
+              onDeleteSurvey={onDeleteSurvey}
+              onToggleActive={onToggleActive}
+              onSetPrimaryActive={onSetPrimaryActive}
+              onTestSurvey={onTestSurveyAsParticipant}
+            />
+          )}
+
+          {/* TAB 3: MENSAJE DE CORREO (EDICIÓN COMPLETA) */}
+          {activeTab === 'email' && onUpdatePlatformSettings && (
+            <EmailTemplateEditor
+              platformSettings={platformSettings || { title: 'Sistema de Encuestas GRUPO ULEP SAS' }}
+              surveys={surveys}
+              responses={responses}
+              onUpdatePlatformSettings={onUpdatePlatformSettings}
+            />
+          )}
+
+          {/* TAB 5: GOOGLE SHEETS & GMAIL */}
+          {activeTab === 'google' && onUpdatePlatformSettings && (
+            <GoogleIntegrationsCard
+              platformSettings={platformSettings || { title: 'Sistema de Encuestas GRUPO ULEP SAS' }}
+              surveys={surveys}
+              responses={responses}
+              onUpdatePlatformSettings={onUpdatePlatformSettings}
+            />
+          )}
+
+          {/* TAB 5: TÍTULO & CONFIGURACIÓN */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6">
+              {/* 1. TÍTULO E IDENTIDAD DE LA PLATAFORMA */}
+              <div className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      confirmAction === 'clear' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'
-                    }`}>
-                      {confirmAction === 'clear' ? (
-                        <FileSpreadsheet className="w-5 h-5" />
-                      ) : (
-                        <RotateCcw className="w-5 h-5" />
-                      )}
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Sliders className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-base font-bold text-slate-900">
-                        {confirmAction === 'clear' ? '¿Vaciar todas las respuestas?' : '¿Restaurar datos por defecto?'}
-                      </h3>
+                      <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                        Título e Identidad de la Plataforma
+                      </h2>
                       <p className="text-xs text-slate-500">
-                        {confirmAction === 'clear' 
-                          ? 'Se eliminarán todos los registros de participantes pero se mantendrán las encuestas.'
-                          : 'Se restablecerán las 3 encuestas iniciales, los auxiliares y 10 respuestas de muestra.'
-                        }
+                        Personalice el nombre oficial y subtítulo de la empresa que verán los participantes y auxiliares.
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2.5 pt-2">
+                  {titleSavedNotification && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 animate-pulse self-start sm:self-auto">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>¡Título guardado con éxito!</span>
+                    </span>
+                  )}
+                </div>
+
+                <form onSubmit={handleSavePlatformTitle} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Título Principal */}
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                        Título de la Plataforma de Encuestas <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={titleForm.title}
+                        onChange={(e) => setTitleForm({ ...titleForm, title: e.target.value })}
+                        placeholder="Ej: Sistema de Encuestas GRUPO ULEP SAS / Evaluación 2026"
+                        className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm font-semibold text-slate-900 transition-all shadow-2xs"
+                        required
+                      />
+                      <p className="text-2xs text-slate-500 mt-1">
+                        Este título aparecerá en el encabezado general, pantalla de ingreso de participantes y pestaña del navegador.
+                      </p>
+                    </div>
+
+                    {/* Subtítulo */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                        Subtítulo o Lema Institucional
+                      </label>
+                      <input
+                        type="text"
+                        value={titleForm.subtitle || ''}
+                        onChange={(e) => setTitleForm({ ...titleForm, subtitle: e.target.value })}
+                        placeholder="Ej: Gestión y Evaluación de Servicios - GRUPO ULEP SAS"
+                        className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 transition-all shadow-2xs"
+                      />
+                    </div>
+
+                    {/* Siglas / Nombre Corto */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
+                        Nombre Corto / Razón Social
+                      </label>
+                      <input
+                        type="text"
+                        value={titleForm.institutionName || ''}
+                        onChange={(e) => setTitleForm({ ...titleForm, institutionName: e.target.value })}
+                        placeholder="Ej: GRUPO ULEP SAS"
+                        className="w-full px-4 py-2.5 bg-white rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 transition-all shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live Preview */}
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                    <div className="text-2xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Vista previa en vivo:</span>
+                    </div>
+                    <div className="flex items-center gap-3.5 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+                        <ClipboardList className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-black text-slate-900 leading-snug">
+                          {titleForm.title.trim() || '(Sin título)'}
+                        </div>
+                        {titleForm.subtitle && (
+                          <div className="text-xs text-slate-500 font-medium">
+                            {titleForm.subtitle}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                     <button
-                      onClick={() => setConfirmAction(null)}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                      type="button"
+                      onClick={handleResetTitleToDefault}
+                      className="text-xs text-slate-500 hover:text-indigo-600 font-semibold transition-colors cursor-pointer"
                     >
-                      Cancelar
+                      Restaurar Valores por Defecto (GRUPO ULEP SAS)
                     </button>
+
                     <button
-                      onClick={() => {
-                        if (confirmAction === 'clear') {
-                          onClearResponses();
-                        } else {
-                          onResetToDefaults();
-                        }
-                        setConfirmAction(null);
-                      }}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer shadow-xs ${
-                        confirmAction === 'clear' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-indigo-600 hover:bg-indigo-700'
-                      }`}
+                      type="submit"
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-all flex items-center gap-2 cursor-pointer"
                     >
-                      {confirmAction === 'clear' ? 'Sí, Vaciar Respuestas' : 'Sí, Restaurar Datos'}
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Guardar Título de la Plataforma</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* 2. MANTENIMIENTO Y PERSISTENCIA */}
+              <div className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Mantenimiento y Respaldo de Datos
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Opciones para reiniciar datos de prueba o limpiar respuestas de sondeos antiguos.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                  {/* Reset to defaults */}
+                  <div className="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                    <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                      <RotateCcw className="w-4 h-4 text-indigo-600" />
+                      <span>Restaurar Datos Iniciales de Muestra</span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      Restaura las 3 encuestas modelo, auxiliares de ejemplo y 10 respuestas analíticas iniciales para pruebas.
+                    </p>
+                    <button
+                      onClick={() => setConfirmAction('reset')}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-2xs"
+                    >
+                      Restaurar Datos de Demostración
+                    </button>
+                  </div>
+
+                  {/* Clear responses */}
+                  <div className="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                    <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                      <FileSpreadsheet className="w-4 h-4 text-rose-600" />
+                      <span>Limpiar Todas las Respuestas</span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      Conserva las encuestas y auxiliares pero reinicia el contador de respuestas a 0 para empezar un sondeo limpio.
+                    </p>
+                    <button
+                      onClick={() => setConfirmAction('clear')}
+                      className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold cursor-pointer"
+                    >
+                      Vaciar Respuestas Registradas
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
 
-            <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 text-xs text-indigo-900 space-y-1">
-              <p className="font-bold flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-indigo-600" />
-                Garantía de Persistencia Local
-              </p>
-              <p className="text-slate-600">
-                Todas las encuestas creadas, los auxiliares añadidos y las respuestas enviadas en vivo se almacenan automáticamente en el navegador y sobreviven recargas de página.
-              </p>
+                {/* Firestore info */}
+                <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 text-xs text-indigo-950 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5 text-indigo-900">
+                    <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                    Sincronización en la Nube y Almacenamiento Local
+                  </p>
+                  <p className="text-slate-600">
+                    Toda la información se sincroniza automáticamente con Firebase Firestore y dispone de respaldo seguro en el navegador.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* ============================================================ */}
+      {/* 4. MODALS & CONFIRMATIONS                                    */}
+      {/* ============================================================ */}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                confirmAction === 'clear' ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600'
+              }`}>
+                {confirmAction === 'clear' ? (
+                  <FileSpreadsheet className="w-5 h-5" />
+                ) : (
+                  <RotateCcw className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {confirmAction === 'clear' ? '¿Vaciar todas las respuestas?' : '¿Restaurar datos por defecto?'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {confirmAction === 'clear' 
+                    ? 'Se eliminarán todos los registros de participantes pero se mantendrán las encuestas.'
+                    : 'Se restablecerán las 3 encuestas iniciales, los auxiliares y 10 respuestas de muestra.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmAction === 'clear') {
+                    onClearResponses();
+                  } else {
+                    onResetToDefaults();
+                  }
+                  setConfirmAction(null);
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer shadow-2xs ${
+                  confirmAction === 'clear' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                }`}
+              >
+                {confirmAction === 'clear' ? 'Sí, Vaciar Respuestas' : 'Sí, Restaurar Datos'}
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Quick Title Edit Modal */}
+      {/* Quick Title Modal */}
       {showTitleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full shadow-2xl border border-slate-200 space-y-5">
@@ -515,7 +745,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     Poner Título a la Plataforma de Encuestas
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Actualice el nombre institucional de la plataforma al instante.
+                    Actualice el nombre oficial y subtítulo de la plataforma al instante.
                   </p>
                 </div>
               </div>
@@ -537,8 +767,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   type="text"
                   value={titleForm.title}
                   onChange={(e) => setTitleForm({ ...titleForm, title: e.target.value })}
-                  placeholder="Ej: Sistema de Encuestas IULEP"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm font-semibold text-slate-900 shadow-xs"
+                  placeholder="Ej: Sistema de Encuestas GRUPO ULEP SAS"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm font-semibold text-slate-900 shadow-2xs"
                   autoFocus
                   required
                 />
@@ -546,27 +776,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                  Subtítulo o Dependencia
+                  Subtítulo o Descripción
                 </label>
                 <input
                   type="text"
                   value={titleForm.subtitle || ''}
                   onChange={(e) => setTitleForm({ ...titleForm, subtitle: e.target.value })}
-                  placeholder="Ej: Instituto Universitario Latinoamericano de Posgrado"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 shadow-xs"
+                  placeholder="Ej: Gestión y Evaluación de Servicios - GRUPO ULEP SAS"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 shadow-2xs"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                  Siglas Institucionales
+                  Nombre Corto / Razón Social
                 </label>
                 <input
                   type="text"
                   value={titleForm.institutionName || ''}
                   onChange={(e) => setTitleForm({ ...titleForm, institutionName: e.target.value })}
-                  placeholder="Ej: IULEP"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 shadow-xs"
+                  placeholder="Ej: GRUPO ULEP SAS"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none text-sm text-slate-800 shadow-2xs"
                 />
               </div>
 
@@ -576,7 +806,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onClick={handleResetTitleToDefault}
                   className="text-xs text-slate-500 hover:text-indigo-600 font-semibold transition-colors cursor-pointer"
                 >
-                  Restaurar IULEP
+                  Restaurar GRUPO ULEP SAS
                 </button>
                 <div className="flex gap-2">
                   <button
@@ -588,7 +818,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>Guardar Título</span>

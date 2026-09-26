@@ -1,17 +1,22 @@
-import { Survey, Auxiliary, SurveyResponse, PlatformSettings } from '../types';
-import { INITIAL_SURVEYS, INITIAL_AUXILIARIES, INITIAL_RESPONSES } from '../data/initialData';
+import { Survey, SurveyResponse, PlatformSettings } from '../types';
+import { INITIAL_SURVEYS, INITIAL_RESPONSES } from '../data/initialData';
 
 const STORAGE_KEYS = {
   SURVEYS: 'iulep_surveys_v2',
-  AUXILIARIES: 'iulep_auxiliaries_v2',
   RESPONSES: 'iulep_responses_v2',
   SETTINGS: 'iulep_platform_settings_v1',
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
-  title: 'Sistema de Encuestas IULEP',
-  subtitle: 'Instituto Universitario Latinoamericano de Posgrado',
-  institutionName: 'IULEP',
+  title: 'Sistema de Encuestas GRUPO ULEP SAS',
+  subtitle: 'Gestión y Evaluación de Servicios - GRUPO ULEP SAS',
+  institutionName: 'GRUPO ULEP SAS',
+  googleIntegration: {
+    autoSyncSheets: true,
+    autoSendEmailNotification: true,
+    sheetName: 'Respuestas',
+    notificationEmail: 'grupoulep@gmail.com',
+  },
 };
 
 export const getStoredPlatformSettings = (): PlatformSettings => {
@@ -22,10 +27,29 @@ export const getStoredPlatformSettings = (): PlatformSettings => {
       return DEFAULT_PLATFORM_SETTINGS;
     }
     const parsed = JSON.parse(raw);
+    const title = parsed.title && !parsed.title.includes('IULEP') && !parsed.title.toLowerCase().includes('instituto')
+      ? parsed.title
+      : DEFAULT_PLATFORM_SETTINGS.title;
+    const institutionName = parsed.institutionName && !parsed.institutionName.includes('IULEP') && !parsed.institutionName.toLowerCase().includes('instituto')
+      ? parsed.institutionName
+      : DEFAULT_PLATFORM_SETTINGS.institutionName;
+    const subtitle = parsed.subtitle && !parsed.subtitle.toLowerCase().includes('instituto') && !parsed.subtitle.toLowerCase().includes('posgrado')
+      ? parsed.subtitle
+      : DEFAULT_PLATFORM_SETTINGS.subtitle;
+
     return {
-      title: parsed.title || DEFAULT_PLATFORM_SETTINGS.title,
-      subtitle: parsed.subtitle !== undefined ? parsed.subtitle : DEFAULT_PLATFORM_SETTINGS.subtitle,
-      institutionName: parsed.institutionName || DEFAULT_PLATFORM_SETTINGS.institutionName,
+      title,
+      subtitle,
+      institutionName,
+      googleIntegration: {
+        autoSyncSheets: parsed.googleIntegration?.autoSyncSheets ?? true,
+        autoSendEmailNotification: parsed.googleIntegration?.autoSendEmailNotification ?? true,
+        sheetName: parsed.googleIntegration?.sheetName || 'Respuestas',
+        notificationEmail: parsed.googleIntegration?.notificationEmail || 'grupoulep@gmail.com',
+        spreadsheetId: parsed.googleIntegration?.spreadsheetId || '',
+        accessToken: parsed.googleIntegration?.accessToken,
+        tokenExpiry: parsed.googleIntegration?.tokenExpiry,
+      },
     };
   } catch (e) {
     console.error('Error reading platform settings from storage', e);
@@ -63,28 +87,6 @@ export const saveStoredSurveys = (surveys: Survey[]) => {
   }
 };
 
-export const getStoredAuxiliaries = (): Auxiliary[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.AUXILIARIES);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.AUXILIARIES, JSON.stringify(INITIAL_AUXILIARIES));
-      return INITIAL_AUXILIARIES;
-    }
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Error reading auxiliaries', e);
-    return INITIAL_AUXILIARIES;
-  }
-};
-
-export const saveStoredAuxiliaries = (auxiliaries: Auxiliary[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.AUXILIARIES, JSON.stringify(auxiliaries));
-  } catch (e) {
-    console.error('Error saving auxiliaries', e);
-  }
-};
-
 export const getStoredResponses = (): SurveyResponse[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.RESPONSES);
@@ -109,7 +111,6 @@ export const saveStoredResponses = (responses: SurveyResponse[]) => {
 
 export const resetToDefaultData = () => {
   localStorage.setItem(STORAGE_KEYS.SURVEYS, JSON.stringify(INITIAL_SURVEYS));
-  localStorage.setItem(STORAGE_KEYS.AUXILIARIES, JSON.stringify(INITIAL_AUXILIARIES));
   localStorage.setItem(STORAGE_KEYS.RESPONSES, JSON.stringify(INITIAL_RESPONSES));
   localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(DEFAULT_PLATFORM_SETTINGS));
 };
@@ -122,7 +123,7 @@ export const exportResponsesToCSV = (survey: Survey, responses: SurveyResponse[]
   }
 
   const questionHeaders = survey.questions.map((q) => `"${q.title.replace(/"/g, '""')}"`);
-  const headerRow = ['"ID Respuesta"', '"Participante"', '"Fecha"', '"Registrado Por"', ...questionHeaders].join(',');
+  const headerRow = ['"ID Respuesta"', '"Participante"', '"Correo Electrónico"', '"Fecha"', '"Registrado Por"', ...questionHeaders].join(',');
 
   const rows = surveyResponses.map((res) => {
     const dateStr = new Date(res.submittedAt).toLocaleString('es-ES');
@@ -138,6 +139,7 @@ export const exportResponsesToCSV = (survey: Survey, responses: SurveyResponse[]
     return [
       `"${res.id}"`,
       `"${res.participantName.replace(/"/g, '""')}"`,
+      `"${(res.participantEmail || '').replace(/"/g, '""')}"`,
       `"${dateStr}"`,
       `"${res.registeredBy || 'direct'}"`,
       ...answerCols,

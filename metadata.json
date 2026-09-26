@@ -1,6 +1,6 @@
 {
-  "name": "Sistema de Encuestas IULEP",
-  "description": "Plataforma interactiva de encuestas con panel de administración, gestión de auxiliares, control de acceso y reportes en tiempo real.",
+  "name": "Sistema de Encuestas GRUPO ULEP SAS",
+  "description": "Plataforma de gestión de encuestas, evaluación y respuestas en tiempo real para GRUPO ULEP SAS.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

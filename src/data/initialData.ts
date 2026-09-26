@@ -1,11 +1,11 @@
-import { Survey, Auxiliary, SurveyResponse } from '../types';
+import { Survey, SurveyResponse } from '../types';
 
 export const INITIAL_SURVEYS: Survey[] = [
   {
     id: 'survey-1',
-    title: 'Encuesta de Satisfacción y Calidad Institucional IULEP 2026',
-    description: 'Evaluación integral de la experiencia del usuario, atención al público y canales de servicio.',
-    category: 'Calidad Institucional',
+    title: 'Encuesta de Satisfacción y Calidad de Servicio GRUPO ULEP SAS 2026',
+    description: 'Evaluación integral de la experiencia del usuario, atención y canales de servicio.',
+    category: 'Calidad de Servicio',
     isActive: true,
     isPrimaryActive: true,
     createdAt: '2026-03-01T10:00:00.000Z',
@@ -22,14 +22,14 @@ export const INITIAL_SURVEYS: Survey[] = [
       },
       {
         id: 'q2',
-        title: '¿Cuál fue el canal principal a través del cual realizó su consulta o trámite?',
+        title: '¿Cuál fue el canal principal a través del cual realizó su consulta o requerimiento?',
         type: 'single',
         required: true,
         options: [
-          'Ventanilla Presencial',
+          'Atención Presencial',
           'Portal Web / Plataforma Virtual',
           'Línea Telefónica / WhatsApp',
-          'Correo Electrónico Institucional',
+          'Correo Electrónico Corporativo',
         ],
       },
       {
@@ -48,7 +48,7 @@ export const INITIAL_SURVEYS: Survey[] = [
       },
       {
         id: 'q4',
-        title: '¿Recomendaría los servicios y programas de IULEP a otros miembros o colegas?',
+        title: '¿Recomendaría los servicios y programas de GRUPO ULEP SAS a otros miembros o colegas?',
         type: 'yesno',
         required: true,
       },
@@ -108,7 +108,7 @@ export const INITIAL_SURVEYS: Survey[] = [
   {
     id: 'survey-3',
     title: 'Sondeo de Clima Laboral y Bienestar del Personal',
-    description: 'Diagnóstico interno sobre balance vida-trabajo, infraestructura y ambiente de colaboración institucional.',
+    description: 'Diagnóstico interno sobre balance vida-trabajo, infraestructura y ambiente de colaboración del equipo.',
     category: 'Recursos Humanos',
     isActive: true,
     isPrimaryActive: false,
@@ -121,11 +121,11 @@ export const INITIAL_SURVEYS: Survey[] = [
         required: true,
         options: [
           'Dirección y Administración General',
-          'Coordinación Académica y Docencia',
+          'Gestión de Proyectos y Operaciones',
           'Tecnología e Infraestructura',
-          'Atención al Usuario y Registro',
+          'Atención al Cliente y Registro',
           'Talento Humano y Bienestar',
-          'Comunicaciones y Relaciones Institucionales'
+          'Comunicaciones y Mercadeo'
         ],
       },
       {
@@ -145,7 +145,7 @@ export const INITIAL_SURVEYS: Survey[] = [
       },
       {
         id: 'q3_4',
-        title: '¿Qué tan probable es que recomiende IULEP como un excelente lugar de trabajo?',
+        title: '¿Qué tan probable es que recomiende GRUPO ULEP SAS como un excelente lugar de trabajo?',
         description: 'Métrica eNPS interna (Escala 0 al 10).',
         type: 'nps',
         required: true,
@@ -169,19 +169,19 @@ export const INITIAL_SURVEYS: Survey[] = [
     questions: [
       {
         id: 'q4_1',
-        title: 'Sede o campus principal donde hace uso de las instalaciones:',
+        title: 'Sede u oficina donde hace uso de las instalaciones:',
         type: 'dropdown',
         required: true,
         options: [
-          'Campus Central IULEP - Edificio A',
-          'Edificio de Posgrados y Diplomados',
+          'Sede Central GRUPO ULEP SAS - Edificio Principal',
+          'Oficinas Administrativas y Comerciales',
           'Laboratorios de Cómputo e Innovación',
-          'Campus Virtual / Remoto'
+          'Modalidad Virtual / Remoto'
         ],
       },
       {
         id: 'q4_2',
-        title: 'Calidad de la conectividad a internet (Wi-Fi institucional):',
+        title: 'Calidad de la conectividad a internet (Wi-Fi de la sede):',
         type: 'rating',
         required: true,
         ratingScale: 5,
@@ -224,7 +224,7 @@ export const INITIAL_SURVEYS: Survey[] = [
   {
     id: 'survey-5',
     title: 'Sondeo de Nuevos Diplomados y Programas de Extensión',
-    description: 'Investigación de mercado académico sobre intereses formativos, modalidades y certificaciones.',
+    description: 'Investigación de mercado y requerimientos sobre necesidades formativas, modalidades y certificaciones.',
     category: 'Formación Continua',
     isActive: true,
     isPrimaryActive: false,
@@ -271,8 +271,8 @@ export const INITIAL_SURVEYS: Survey[] = [
   },
   {
     id: 'survey-6',
-    title: 'Encuesta Rápida de Eventos y Seminarios IULEP',
-    description: 'Medición de impacto y NPS de las ponencias magistrales, conferencias y foros académicos.',
+    title: 'Encuesta Rápida de Eventos y Seminarios GRUPO ULEP SAS',
+    description: 'Medición de impacto y NPS de los talleres, eventos y seminarios empresariales.',
     category: 'Eventos',
     isActive: true,
     isPrimaryActive: false,
@@ -295,7 +295,7 @@ export const INITIAL_SURVEYS: Survey[] = [
       },
       {
         id: 'q6_3',
-        title: '¿Recomendaría este tipo de eventos IULEP a colegas o compañeros de profesión?',
+        title: '¿Recomendaría este tipo de eventos de GRUPO ULEP SAS a colegas o compañeros de profesión?',
         description: 'Net Promoter Score (0 a 10).',
         type: 'nps',
         required: true,
@@ -307,33 +307,6 @@ export const INITIAL_SURVEYS: Survey[] = [
         required: false,
       }
     ],
-  },
-];
-
-export const INITIAL_AUXILIARIES: Auxiliary[] = [
-  {
-    id: 'aux-1',
-    name: 'Carlos Mendoza',
-    accessCode: 'AUX-CARLOS',
-    department: 'Coordinación Académica',
-    assignedSurveyIds: ['survey-1', 'survey-2'],
-    createdAt: '2026-03-02T11:00:00.000Z',
-  },
-  {
-    id: 'aux-2',
-    name: 'Mariana Ruiz',
-    accessCode: 'AUX-MARIANA',
-    department: 'Atención al Usuario y Registro',
-    assignedSurveyIds: ['survey-1'],
-    createdAt: '2026-03-04T16:20:00.000Z',
-  },
-  {
-    id: 'aux-3',
-    name: 'Eduardo Peña',
-    accessCode: 'AUX-EDUARDO',
-    department: 'Talento Humano',
-    assignedSurveyIds: ['survey-3'],
-    createdAt: '2026-03-11T08:15:00.000Z',
   },
 ];
 
@@ -387,7 +360,7 @@ export const INITIAL_RESPONSES: SurveyResponse[] = [
     submittedAt: '2026-03-14T11:05:00.000Z',
     answers: {
       q1: 3,
-      q2: 'Correo Electrónico Institucional',
+      q2: 'Correo Electrónico Corporativo',
       q3: ['Claridad en las instrucciones y requisitos'],
       q4: 'yes',
       q5: 'El correo tardó 48 horas en recibir respuesta, pero la explicación fue detallada.',

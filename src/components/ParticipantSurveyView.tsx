@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { Survey, Question, PlatformSettings } from '../types';
-import { CheckCircle2, Star, ThumbsUp, ThumbsDown, AlertCircle, Send, RefreshCw, ClipboardCheck, Sparkles } from 'lucide-react';
+import { CheckCircle2, Star, ThumbsUp, ThumbsDown, AlertCircle, Send, ClipboardCheck, Sparkles, FileSpreadsheet, Mail, User } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ParticipantSurveyViewProps {
   survey: Survey;
   participantName: string;
+  participantEmail?: string;
   registeredBy?: string;
   platformSettings?: PlatformSettings;
-  onSubmit: (answers: Record<string, any>) => void;
+  onSubmit: (answers: Record<string, any>, participantInfo?: { name: string; email: string }) => void;
   onExit: () => void;
 }
 
 export const ParticipantSurveyView: React.FC<ParticipantSurveyViewProps> = ({
   survey,
   participantName,
+  participantEmail = '',
   registeredBy,
   platformSettings,
   onSubmit,
@@ -78,9 +80,11 @@ export const ParticipantSurveyView: React.FC<ParticipantSurveyViewProps> = ({
     });
   };
 
-  // Validate required questions
+  // Validate required questions and participant details
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate required questions
     const newErrors: Record<string, string> = {};
 
     survey.questions.forEach((q) => {
@@ -117,7 +121,7 @@ export const ParticipantSurveyView: React.FC<ParticipantSurveyViewProps> = ({
     }
 
     setSubmitted(true);
-    onSubmit(answers);
+    onSubmit(answers, { name: participantName, email: participantEmail });
   };
 
   if (submitted) {
@@ -132,45 +136,14 @@ export const ParticipantSurveyView: React.FC<ParticipantSurveyViewProps> = ({
             <CheckCircle2 className="w-9 h-9" />
           </div>
           <h2 className="text-2xl font-bold text-slate-900 mb-2">¡Muchas gracias, {participantName}!</h2>
-          <p className="text-slate-600 text-sm max-w-md mx-auto mb-6">
-            Tus respuestas para <span className="font-semibold text-slate-800">&quot;{survey.title}&quot;</span> han sido registradas exitosamente en tiempo real.
+          <p className="text-slate-600 text-sm max-w-md mx-auto mb-8">
+            Tus respuestas para <span className="font-semibold text-slate-800">&quot;{survey.title}&quot;</span> han sido registradas exitosamente.
           </p>
 
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-left text-xs text-slate-600 mb-8 space-y-1">
-            <div className="flex justify-between">
-              <span className="font-medium text-slate-500">ID Encuesta:</span>
-              <span className="font-mono">{survey.id}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-medium text-slate-500">Participante:</span>
-              <span className="font-semibold text-slate-800">{participantName}</span>
-            </div>
-            {registeredBy && (
-              <div className="flex justify-between">
-                <span className="font-medium text-slate-500">Registrado por auxiliar:</span>
-                <span className="font-semibold text-amber-700">{registeredBy}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="font-medium text-slate-500">Fecha y hora:</span>
-              <span>{new Date().toLocaleTimeString('es-ES')}</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              onClick={() => {
-                setAnswers({});
-                setSubmitted(false);
-              }}
-              className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Responder de nuevo
-            </button>
+          <div className="flex justify-center">
             <button
               onClick={onExit}
-              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition-all"
+              className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition-all"
             >
               Volver al inicio
             </button>
@@ -182,54 +155,25 @@ export const ParticipantSurveyView: React.FC<ParticipantSurveyViewProps> = ({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 sm:py-10">
-      {/* Top Institutional Platform Header */}
+      {/* Top Header */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
             <ClipboardCheck className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">
-              {platformSettings?.title || 'Sistema de Encuestas IULEP'}
-            </div>
-            {platformSettings?.subtitle && (
-              <div className="text-2xs sm:text-xs text-slate-500 font-medium">
-                {platformSettings.subtitle}
-              </div>
-            )}
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+              {survey.title || platformSettings?.title || 'Sistema de Encuestas GRUPO ULEP SAS'}
+            </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-            <span>Participante:</span>
-            <strong className="text-slate-900 font-bold">{participantName}</strong>
-          </span>
-          {registeredBy && (
+        {registeredBy && (
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-2xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
               Auxiliar: {registeredBy}
             </span>
-          )}
-        </div>
-      </div>
-
-      {/* Survey Title & Description Banner */}
-      <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-2xl p-6 sm:p-7 text-white shadow-md border border-indigo-700/50 mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="px-2.5 py-0.5 rounded-full text-2xs font-bold bg-indigo-500/40 text-indigo-200 uppercase tracking-wider">
-            {survey.category || 'Encuesta Institucional'}
-          </span>
-          <span className="text-2xs text-indigo-300">
-            {survey.questions.length} preguntas
-          </span>
-        </div>
-        <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-          {survey.title}
-        </h1>
-        {survey.description && (
-          <p className="text-xs sm:text-sm text-indigo-200/90 mt-2 leading-relaxed">
-            {survey.description}
-          </p>
+          </div>
         )}
       </div>
 

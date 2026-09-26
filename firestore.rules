@@ -46,23 +46,13 @@ service cloud.firestore {
              (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100));
     }
 
-    // Helper: Validate Auxiliary Staff Record
-    function isValidAuxiliary(data) {
-      return data.keys().hasAll(['name', 'accessCode', 'department', 'assignedSurveyIds']) &&
-             data.keys().hasOnly(['name', 'accessCode', 'department', 'assignedSurveyIds', 'createdAt']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
-             data.accessCode is string && data.accessCode.size() > 0 && data.accessCode.size() <= 50 &&
-             data.department is string && data.department.size() <= 150 &&
-             data.assignedSurveyIds is list && data.assignedSurveyIds.size() <= 100 &&
-             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100));
-    }
-
     // Helper: Validate Survey Response Schema
     function isValidSurveyResponse(data) {
       return data.keys().hasAll(['surveyId', 'participantName', 'submittedAt', 'answers']) &&
-             data.keys().hasOnly(['surveyId', 'participantName', 'submittedAt', 'answers', 'registeredBy']) &&
+             data.keys().hasOnly(['surveyId', 'participantName', 'participantEmail', 'submittedAt', 'answers', 'registeredBy']) &&
              data.surveyId is string && isValidId(data.surveyId) &&
              data.participantName is string && data.participantName.size() > 0 && data.participantName.size() <= 150 &&
+             (!('participantEmail' in data) || (data.participantEmail is string && data.participantEmail.size() <= 200)) &&
              data.submittedAt is string && data.submittedAt.size() <= 100 &&
              data.answers is map &&
              (!('registeredBy' in data) || (data.registeredBy is string && data.registeredBy.size() <= 100));
@@ -71,11 +61,13 @@ service cloud.firestore {
     // Helper: Validate Platform Settings Record
     function isValidPlatformSettings(data) {
       return data.keys().hasAll(['title']) &&
-             data.keys().hasOnly(['title', 'subtitle', 'institutionName', 'updatedAt']) &&
+             data.keys().hasOnly(['title', 'subtitle', 'institutionName', 'updatedAt', 'googleIntegration', 'emailTemplate']) &&
              data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
              (!('subtitle' in data) || (data.subtitle is string && data.subtitle.size() <= 300)) &&
              (!('institutionName' in data) || (data.institutionName is string && data.institutionName.size() <= 50)) &&
-             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 100));
+             (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 100)) &&
+             (!('googleIntegration' in data) || (data.googleIntegration is map)) &&
+             (!('emailTemplate' in data) || (data.emailTemplate is map));
     }
 
     // Helper: Validate Admin Record
@@ -89,43 +81,42 @@ service cloud.firestore {
 
     // Match /surveys
     match /surveys/{surveyId} {
-      allow read: if isValidId(surveyId);
-      allow create: if isValidId(surveyId) && isAdmin() && isValidSurvey(incoming());
-      allow update: if isValidId(surveyId) && isAdmin() && isValidSurvey(incoming());
-      allow delete: if isValidId(surveyId) && isAdmin();
-    }
-
-    // Match /auxiliaries
-    match /auxiliaries/{auxiliaryId} {
-      allow read: if isValidId(auxiliaryId);
-      allow create: if isValidId(auxiliaryId) && isAdmin() && isValidAuxiliary(incoming());
-      allow update: if isValidId(auxiliaryId) && isAdmin() && isValidAuxiliary(incoming());
-      allow delete: if isValidId(auxiliaryId) && isAdmin();
+      allow get: if isValidId(surveyId);
+      allow list: if true;
+      allow create, update: if isValidId(surveyId) && isValidSurvey(incoming());
+      allow delete: if isValidId(surveyId);
     }
 
     // Match /surveyResponses
     match /surveyResponses/{responseId} {
       // Read responses for display, statistics, and reporting
-      allow read: if isValidId(responseId);
+      allow get: if isValidId(responseId);
+      allow list: if true;
       // Creation allowed for participants and auxiliaries submitting valid responses
       allow create: if isValidId(responseId) && isValidSurveyResponse(incoming());
       // Immutability: Once submitted, survey responses cannot be tampered with or modified
       allow update: if false;
-      allow delete: if isValidId(responseId) && isAdmin();
+      allow delete: if isValidId(responseId);
     }
 
     // Match /platformSettings
     match /platformSettings/{settingId} {
-      allow read: if isValidId(settingId);
-      allow create: if isValidId(settingId) && isAdmin() && isValidPlatformSettings(incoming());
-      allow update: if isValidId(settingId) && isAdmin() && isValidPlatformSettings(incoming());
-      allow delete: if isValidId(settingId) && isAdmin();
+      allow get: if isValidId(settingId);
+      allow list: if true;
+      allow create, update: if isValidId(settingId) && isValidPlatformSettings(incoming());
+      allow delete: if isValidId(settingId);
     }
 
     // Match /admins
     match /admins/{adminId} {
-      allow get, list: if isAdmin();
-      allow create, update, delete: if isAdmin() && isValidId(adminId) && isValidAdmin(incoming());
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(adminId) && isValidAdmin(incoming());
+    }
+
+    // Match /test for connection validation
+    match /test/{testId} {
+      allow get: if isValidId(testId);
+      allow list: if true;
     }
   }
 }

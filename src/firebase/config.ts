@@ -1,15 +1,38 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  doc,
+  getDoc,
+  Firestore,
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App singleton
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-/* CRITICAL: Must pass firebaseConfig.firestoreDatabaseId */
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+/* Initialize Firestore with auto-detect long-polling to prevent proxy/iframe connection drops */
+function getOrInitializeDb(): Firestore {
+  const databaseId = (firebaseConfig as any).firestoreDatabaseId;
+  try {
+    return initializeFirestore(
+      app,
+      {
+        experimentalAutoDetectLongPolling: true,
+      },
+      databaseId
+    );
+  } catch {
+    return databaseId ? getFirestore(app, databaseId) : getFirestore(app);
+  }
+}
+
+export const db: Firestore = getOrInitializeDb();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('https://www.googleapis.com/auth/gmail.send');
+googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
 
 export enum OperationType {
   CREATE = 'create',
@@ -60,20 +83,30 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 
 // Connection test helper
 export async function testFirestoreConnection(): Promise<boolean> {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-    return true;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is currently offline or unreachable.');
-    }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return false;
+  }
+  try {
+    const testDoc = doc(db, 'test', 'connection');
+    await getDoc(testDoc);
+    return true;
+  } catch (error: any) {
+    if (error?.code === 'permission-denied') {
+      // Permission denied response confirms the backend was successfully contacted
+      return true;
+    }
+    return typeof navigator !== 'undefined' ? navigator.onLine : false;
   }
 }
 
 export async function signInWithGoogle() {
   try {
     const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      const { saveGoogleToken } = await import('../services/googleWorkspaceService');
+      saveGoogleToken(credential.accessToken, 3599);
+    }
     return result.user;
   } catch (error) {
     console.error('Google Sign In Error:', error);

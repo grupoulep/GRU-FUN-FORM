@@ -87,6 +87,11 @@
           "description": "Name or pseudonym of the participant",
           "maxLength": 150
         },
+        "participantEmail": {
+          "type": "string",
+          "description": "Email address of the participant",
+          "maxLength": 200
+        },
         "submittedAt": {
           "type": "string",
           "description": "ISO timestamp of survey completion"

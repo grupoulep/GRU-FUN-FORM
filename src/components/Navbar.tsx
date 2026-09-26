@@ -1,6 +1,6 @@
 import React from 'react';
 import { CurrentUser } from '../types';
-import { ShieldCheck, UserCheck, Users, LogOut, Activity } from 'lucide-react';
+import { ShieldCheck, Users, LogOut, Activity } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: CurrentUser | null;
@@ -24,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-slate-900 tracking-tight text-lg">IOLEP</span>
+              <span className="font-bold text-slate-900 tracking-tight text-lg">GRUPO ULEP</span>
               <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600 border border-slate-200">
                 Encuestas
               </span>
@@ -52,15 +52,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-800 text-xs font-semibold shadow-xs">
                   <ShieldCheck className="w-4 h-4 text-indigo-600" />
                   <span className="hidden sm:inline">Admin Total:</span>
-                  <span>ADMINIOLEP</span>
-                </div>
-              )}
-
-              {currentUser.role === 'auxiliary' && (
-                <div className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
-                  <UserCheck className="w-4 h-4 text-amber-600" />
-                  <span className="hidden sm:inline">Auxiliar:</span>
-                  <span className="font-semibold">{currentUser.name}</span>
+                  <span>ADMIN ULEP</span>
                 </div>
               )}
 

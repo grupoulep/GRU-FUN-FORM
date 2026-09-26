@@ -24,8 +24,17 @@ import {
   Smile,
   Meh,
   Frown,
-  Trash2
+  Trash2,
+  FileSpreadsheet,
+  Mail,
+  Zap
 } from 'lucide-react';
+import {
+  getSavedGoogleToken,
+  requestGoogleAccessToken,
+  createSurveySpreadsheet,
+  appendResponseToGoogleSheet
+} from '../services/googleWorkspaceService';
 
 interface RealtimeReportsProps {
   surveys: Survey[];
@@ -49,6 +58,45 @@ export const RealtimeReports: React.FC<RealtimeReportsProps> = ({
   const [channelFilter, setChannelFilter] = useState<'all' | 'direct' | 'auxiliary'>('all');
   const [selectedResponseDetail, setSelectedResponseDetail] = useState<SurveyResponse | null>(null);
   const [responseToDelete, setResponseToDelete] = useState<SurveyResponse | null>(null);
+  const [isExportingSheets, setIsExportingSheets] = useState(false);
+  const [sheetsNotice, setSheetsNotice] = useState<string>('');
+
+  const handleExportToGoogleSheets = async () => {
+    if (!activeSurvey || surveyResponses.length === 0) {
+      alert('No hay respuestas para exportar.');
+      return;
+    }
+    try {
+      setIsExportingSheets(true);
+      setSheetsNotice('');
+      let token = getSavedGoogleToken();
+      if (!token) {
+        token = await new Promise((resolve, reject) => {
+          requestGoogleAccessToken(resolve, reject);
+        });
+      }
+      if (!token) throw new Error('No se obtuvo token de acceso de Google.');
+
+      const { spreadsheetId, spreadsheetUrl } = await createSurveySpreadsheet(
+        token,
+        `${activeSurvey.title} (${new Date().toLocaleDateString('es-ES')})`,
+        activeSurvey.questions
+      );
+
+      for (const resp of surveyResponses) {
+        await appendResponseToGoogleSheet(token, spreadsheetId, activeSurvey, resp, 'Respuestas');
+      }
+
+      setSheetsNotice(`¡Exportado a Google Sheets con éxito!`);
+      window.open(spreadsheetUrl, '_blank');
+      setTimeout(() => setSheetsNotice(''), 5000);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Error al exportar a Google Sheets.');
+    } finally {
+      setIsExportingSheets(false);
+    }
+  };
 
   const activeSurvey = surveys.find((s) => s.id === selectedSurveyId) || surveys[0];
 
@@ -140,6 +188,7 @@ export const RealtimeReports: React.FC<RealtimeReportsProps> = ({
     return surveyResponses.filter((r) => {
       const matchSearch =
         r.participantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (r.participantEmail && r.participantEmail.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (r.registeredBy && r.registeredBy.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const isDirect = !r.registeredBy || r.registeredBy === 'direct';
@@ -193,6 +242,17 @@ export const RealtimeReports: React.FC<RealtimeReportsProps> = ({
             ))}
           </select>
 
+          {/* Export to Google Sheets button */}
+          <button
+            onClick={handleExportToGoogleSheets}
+            disabled={isExportingSheets}
+            className="px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+            title="Abrir o exportar directamente a una hoja de Google Sheets en tiempo real"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>{isExportingSheets ? 'Exportando...' : 'Google Sheets'}</span>
+          </button>
+
           {/* Export CSV button */}
           <button
             onClick={() => exportResponsesToCSV(activeSurvey, surveyResponses)}
@@ -245,6 +305,22 @@ export const RealtimeReports: React.FC<RealtimeReportsProps> = ({
           )}
         </div>
       </div>
+
+      {/* Notice Banner */}
+      {sheetsNotice && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{sheetsNotice}</span>
+          </div>
+          <button
+            onClick={() => setSheetsNotice('')}
+            className="text-emerald-700 hover:text-emerald-900 p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${npsMetric ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}>
@@ -749,11 +825,21 @@ export const RealtimeReports: React.FC<RealtimeReportsProps> = ({
                 {filteredResponses.map((res) => (
                   <tr key={res.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="px-5 py-3 font-semibold text-slate-900">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs shrink-0">
                           {res.participantName.charAt(0).toUpperCase()}
                         </div>
-                        <span>{res.participantName}</span>
+                        <div>
+                          <div className="text-slate-900 font-bold leading-tight">{res.participantName}</div>
+                          {res.participantEmail ? (
+                            <div className="text-2xs text-slate-500 font-normal flex items-center gap-1 mt-0.5">
+                              <Mail className="w-3 h-3 text-indigo-500 shrink-0" />
+                              <span className="truncate max-w-[200px]">{res.participantEmail}</span>
+                            </div>
+                          ) : (
+                            <div className="text-2xs text-slate-400 italic">Sin correo</div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-3">
@@ -809,9 +895,18 @@ export const RealtimeReports: React.FC<RealtimeReportsProps> = ({
             <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Respuestas de {selectedResponseDetail.participantName}</h3>
-                <p className="text-xs text-slate-500">
-                  Enviado el {new Date(selectedResponseDetail.submittedAt).toLocaleString('es-ES')}
-                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                  {selectedResponseDetail.participantEmail && (
+                    <span className="inline-flex items-center gap-1 text-indigo-700 font-semibold bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                      <Mail className="w-3 h-3 text-indigo-600" />
+                      <span>{selectedResponseDetail.participantEmail}</span>
+                    </span>
+                  )}
+                  <span>Enviado el {new Date(selectedResponseDetail.submittedAt).toLocaleString('es-ES')}</span>
+                  {selectedResponseDetail.registeredBy && (
+                    <span>• Canal: {selectedResponseDetail.registeredBy}</span>
+                  )}
+                </div>
               </div>
               <button
                 onClick={() => setSelectedResponseDetail(null)}

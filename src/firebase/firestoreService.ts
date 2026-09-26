@@ -9,13 +9,12 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from './config';
-import { Survey, Auxiliary, SurveyResponse, PlatformSettings } from '../types';
-import { INITIAL_SURVEYS, INITIAL_AUXILIARIES, INITIAL_RESPONSES } from '../data/initialData';
+import { Survey, SurveyResponse, PlatformSettings } from '../types';
+import { INITIAL_SURVEYS, INITIAL_RESPONSES } from '../data/initialData';
 import { DEFAULT_PLATFORM_SETTINGS } from '../utils/storage';
 
 const PATHS = {
   SURVEYS: 'surveys',
-  AUXILIARIES: 'auxiliaries',
   RESPONSES: 'surveyResponses',
   SETTINGS: 'platformSettings',
   ADMINS: 'admins',
@@ -63,49 +62,7 @@ export async function deleteSurveyFromFirestore(surveyId: string): Promise<void>
   }
 }
 
-// 2. Auxiliaries Realtime Subscription
-export function subscribeToAuxiliaries(
-  onUpdate: (auxiliaries: Auxiliary[]) => void,
-  onError?: (err: any) => void
-): () => void {
-  const colRef = collection(db, PATHS.AUXILIARIES);
-  return onSnapshot(
-    colRef,
-    (snapshot) => {
-      const items: Auxiliary[] = [];
-      snapshot.forEach((docSnap) => {
-        items.push({ ...(docSnap.data() as Auxiliary), id: docSnap.id });
-      });
-      onUpdate(items);
-    },
-    (error) => {
-      console.warn('Firestore auxiliaries subscription notice:', error.message);
-      if (onError) onError(error);
-    }
-  );
-}
-
-export async function saveAuxiliaryToFirestore(auxiliary: Auxiliary): Promise<void> {
-  const path = `${PATHS.AUXILIARIES}/${auxiliary.id}`;
-  try {
-    const docRef = doc(db, PATHS.AUXILIARIES, auxiliary.id);
-    await setDoc(docRef, auxiliary, { merge: true });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
-  }
-}
-
-export async function deleteAuxiliaryFromFirestore(auxiliaryId: string): Promise<void> {
-  const path = `${PATHS.AUXILIARIES}/${auxiliaryId}`;
-  try {
-    const docRef = doc(db, PATHS.AUXILIARIES, auxiliaryId);
-    await deleteDoc(docRef);
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
-  }
-}
-
-// 3. Survey Responses Realtime Subscription
+// 2. Survey Responses Realtime Subscription
 export function subscribeToSurveyResponses(
   onUpdate: (responses: SurveyResponse[]) => void,
   onError?: (err: any) => void
@@ -131,7 +88,19 @@ export async function addSurveyResponseToFirestore(response: SurveyResponse): Pr
   const path = `${PATHS.RESPONSES}/${response.id}`;
   try {
     const docRef = doc(db, PATHS.RESPONSES, response.id);
-    await setDoc(docRef, response);
+    const cleanData: Record<string, any> = {
+      surveyId: response.surveyId,
+      participantName: response.participantName,
+      submittedAt: response.submittedAt,
+      answers: response.answers,
+    };
+    if (response.participantEmail) {
+      cleanData.participantEmail = response.participantEmail;
+    }
+    if (response.registeredBy) {
+      cleanData.registeredBy = response.registeredBy;
+    }
+    await setDoc(docRef, cleanData);
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
   }
@@ -191,10 +160,6 @@ export async function seedInitialFirestoreData(): Promise<void> {
       for (const survey of INITIAL_SURVEYS) {
         const sRef = doc(db, PATHS.SURVEYS, survey.id);
         batch.set(sRef, survey);
-      }
-      for (const aux of INITIAL_AUXILIARIES) {
-        const aRef = doc(db, PATHS.AUXILIARIES, aux.id);
-        batch.set(aRef, aux);
       }
       for (const resp of INITIAL_RESPONSES) {
         const rRef = doc(db, PATHS.RESPONSES, resp.id);
